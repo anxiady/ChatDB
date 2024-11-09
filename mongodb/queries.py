@@ -10,3 +10,4 @@ def print_all_data(db, collection_name):
     collection = db[collection_name]
     results = collection.find()  # No filter, returns all documents
     return list(results)
+
