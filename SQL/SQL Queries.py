@@ -304,9 +304,10 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                 filtered_tokens, tagged_tokens = preprocess(user_input)
                 specific_query = [query for query in queries if query in filtered_tokens]
             selected_queries = specific_query[:num_queries]
-   
+
     for query in selected_queries:
         
+        # where and having 
         if 'where' in specific_query and 'having' in specific_query and numeric_columns and categorical_columns:
 
             if random_queries:
@@ -417,7 +418,6 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                                     f"Query: {query}")
 
                 
-
         # having
         elif query == 'having' and numeric_columns and categorical_columns:
         
