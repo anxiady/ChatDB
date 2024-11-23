@@ -6,6 +6,11 @@ def connect_to_mongodb(uri, db_name):
     return client[db_name]
 
 def upload_data_to_collection(db, collection_name, file_path):
+    # Check if the collection already exists
+    if collection_name in db.list_collection_names():
+        print(f"\033[91mWarning:\033[0m The collection '{collection_name}' already exists in the database. \nData upload Aborted.")
+        return
+
     collection = db[collection_name]
     data = pd.read_csv(file_path, encoding='ISO-8859-1')
     data_dict = data.to_dict('records')
@@ -13,7 +18,9 @@ def upload_data_to_collection(db, collection_name, file_path):
     for record in data_dict:
         if not collection.find_one(record):
             collection.insert_one(record)
+
     print(f"Data from {file_path} has been successfully imported into MongoDB.")
+    print("Data uploaded successfully!")
 
 def check_and_drop_database(uri, db_name):
     client = MongoClient(uri)

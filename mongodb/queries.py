@@ -1,5 +1,6 @@
 from pprint import pprint
 from tabulate import tabulate
+from prettytable import PrettyTable
 
 def execute_mongo_query(db, collection_name, query):
     collection = db[collection_name]
@@ -20,13 +21,28 @@ def print_all_data(db, collection_name):
 #     for idx, record in enumerate(first_five, start=1):
 #         print(f"Record {idx}: {record}")
 
-def display_first_five_rows(db, collection_name):
+def display_sample_rows(db, collection_name):
     collection = db[collection_name]
     first_five = collection.find().limit(3)
-    print(f"\nSample data from the '{collection_name}' collection:\n")
+    print(f"\nSample data from the \033[91m{collection_name}\033[0m collection:\n")
     for idx, record in enumerate(first_five, start=1):
         print(f"{idx}:")
         pprint(record)
         print("-" * 60)
 
+def display_columns(db, collection_name):
+    collection = db[collection_name]
+    sample_document = collection.find_one()
+    if not sample_document:
+        print("No documents found in the collection.")
+        return
+
+    table = PrettyTable()
+    table.field_names = ["Column Name", "Type"]
+
+    for key, value in sample_document.items():
+        table.add_row([key, type(value).__name__])
+
+    print(f"Columns in '{collection_name}':")
+    print(table)
 

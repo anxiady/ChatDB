@@ -75,7 +75,7 @@ def generate_example_queries(user_input, db, collection_name):
             selected_attribute_2 = random.choice([attr for attr in attributes if attr != selected_attribute_1])
             natural_language_query = template.replace("<A>", selected_attribute_1).replace("<B>", selected_attribute_2)
 
-            return natural_language_query, generate_query(db.name, collection_name, natural_language_query, selected_attribute_1, selected_attribute_2)
+            return natural_language_query
 
     # If no keyword is found, select a random query template
     templates = list(keyword_templates.values())
@@ -84,7 +84,7 @@ def generate_example_queries(user_input, db, collection_name):
     selected_attribute_2 = random.choice([attr for attr in attributes if attr != selected_attribute_1])
     natural_language_query = selected_template.replace("<A>", selected_attribute_1).replace("<B>", selected_attribute_2)
 
-    return natural_language_query, generate_query(db.name, collection_name, natural_language_query, selected_attribute_1, selected_attribute_2)
+    return natural_language_query
 
 def generate_query(db_name, collection_name, natural_language_query, selected_attribute_1, selected_attribute_2):
     # Generate the corresponding complete MongoDB query
@@ -182,15 +182,212 @@ def execute_query(collection, mongo_query):
     display_result(result)
     return result
 
+def get_execute_query(db, collection_name, random_query):
+    if random_query:
+        print("\n\033[92mTry ask me for example queries (i.e. example mongo queries, average, group by, sum, total)\033[0m")
+        user_input = input("prompt:\t")
+
+        natural_language_query = generate_example_queries(user_input, db, collection_name)
+        print(f"natural language: {natural_language_query}")
+        mongo_query = preprocess(natural_language_query, db, collection_name)
+        # Display the generated example query
+        print(f"\n\033[92mExample Query:\033[0m {natural_language_query}")
+        print(f"\033[92mMongoDB Query:\033[0m {mongo_query}")
+        # print(mongo_query)
+
+        # Execute the query if user wants me to
+        execution = input("\n\033[92mDo you want me to execute the query for you? (y/n)\033[0m")
+        if execution.lower().strip() == 'y':
+            mongo_pipeline = mongo_query
+        else:
+            return
+
+    else:
+        user_input = input("Enter your query: ")
+        natural_language_query = user_input
+
+        mongo_pipeline = preprocess(natural_language_query, db, collection_name)
+    
+        # Convert pipeline to string representation
+        # query_string = convert_pipeline_to_string(db.name, collection_name, mongo_pipeline)
+        # print(f"Generated Query: {query_string}")
+
+        print(f"Generated Query: {mongo_pipeline}")
+    
+    # Execute the generated MongoDB query
+    collection = db[collection_name]
+    result = None
+    try:
+        result = list(collection.aggregate(mongo_pipeline))
+    except Exception as e:
+        result = str(e)
+
+    display_result(result)
+    return result
+
 def display_result(query_result):
+    # print(query_result)
     if not query_result:
         print("No results found.")
     elif isinstance(query_result, str):
         print(f"Error: {query_result}")
     else:
         for i, document in enumerate(query_result, start=1):
+            if i == 10:
+                break
             print(f"Result {i}:")
             for key, value in document.items():
                 print(f"  {key}: {value}")
             print("-" * 40)
+            
 
+def is_numeric_attribute(db, collection_name, attribute):
+    collection = db[collection_name]
+    sample = collection.find_one({attribute: {"$exists": True}})
+    if sample and isinstance(sample.get(attribute), (int, float)):
+        return True
+    return False
+
+def get_attribute_types(db, collection_name):
+    collection = db[collection_name]
+    sample_document = collection.find_one()
+
+    if not sample_document:
+        raise ValueError(f"No documents found in the collection '{collection_name}'.")
+
+    # Infer types from the sample document
+    return {key: type(value).__name__ for key, value in sample_document.items()}
+
+def preprocess(user_input, db, collection_name):
+    # Tokenize and preprocess user input
+    tokens = word_tokenize(user_input.lower())
+    stop_words = set(stopwords.words('english'))
+    filtered_tokens = [word for word in tokens if word.isalnum() and word not in stop_words]
+    tagged_tokens = pos_tag(filtered_tokens)
+
+    # Retrieve collection attributes and their types
+    attributes = get_collection_attributes(db, collection_name)  # Assume this returns a list of attribute names
+    attribute_types = get_attribute_types(db, collection_name)  # Assume this returns a dict {attr_name: type}
+
+    if not attributes:
+        raise ValueError("No attributes found in the collection for executing the query.")
+
+    # Identify keywords and attributes in the user input
+    keywords = []
+    for key in ["sum", "total", "average", "count", "group", "where", "order", "find", "join", "max", "min", "sort"]:
+        if key in user_input.lower():
+            keywords.append(key)
+
+    # Identify the attributes present in the user input
+    selected_attributes = [attr for attr in attributes if re.search(rf"\b{attr}\b", user_input, re.IGNORECASE)]
+
+    # Set default attributes if none are identified
+    if not selected_attributes:
+        selected_attributes = [random.choice(attributes)]
+
+    # Separate the attributes into numeric and string attributes
+    numeric_attributes = [attr for attr in selected_attributes if attribute_types.get(attr) in ("int", "float")]
+    string_attributes = [attr for attr in selected_attributes if attribute_types.get(attr) not in ("int", "float")]
+
+    # Assign the primary attributes for numeric operations and grouping
+    numeric_attribute = numeric_attributes[0] if numeric_attributes else None
+    string_attribute = string_attributes[0] if string_attributes else None
+
+    # Generate MongoDB pipeline based on identified keywords and attributes
+    mongo_pipeline = []
+
+    for keyword in keywords:
+        if keyword in ["total", "sum", "average", "max", "min"]:
+            # Handle aggregation operations
+            if numeric_attribute:
+                group_stage = {
+                    "$group": {
+                        "_id": {string_attribute: f"${string_attribute}"} if string_attribute else None,
+                        "result": {
+                            "$sum" if keyword in ["total", "sum"] else
+                            "$avg" if keyword == "average" else
+                            "$max" if keyword == "max" else
+                            "$min": f"${numeric_attribute}"
+                        },
+                    }
+                }
+                project_stage = {
+                    "$project": {
+                        "result": 1,
+                        string_attribute: 1 if string_attribute else None,
+                    }
+                }
+                mongo_pipeline.append(group_stage)
+                mongo_pipeline.append(project_stage)
+            else:
+                print(f"Cannot perform '{keyword}' on non-numeric fields.")
+        elif keyword == "count":
+            # Handle count
+            group_stage = {
+                "$group": {
+                    "_id": {string_attribute: f"${string_attribute}"} if string_attribute else None,
+                    "count": {"$sum": 1},
+                }
+            }
+            project_stage = {
+                "$project": {
+                    "count": 1,
+                    string_attribute: 1 if string_attribute else None,
+                }
+            }
+            mongo_pipeline.append(group_stage)
+            mongo_pipeline.append(project_stage)
+        elif keyword == "where":
+            # Handle where conditions
+            conditions = {}
+            where_col = next((col for col in selected_attributes if col in filtered_tokens), None)
+            if where_col:
+                condition_operator = next((op for op in [">", "<", ">=", "<=", "="] if op in filtered_tokens), "=")
+                condition_value = next((val for val in filtered_tokens if val.replace(".", "", 1).isdigit()), None)
+                if condition_value:
+                    conditions[where_col] = {f"${condition_operator}": float(condition_value)}
+            mongo_pipeline.append({"$match": conditions})
+        elif keyword in ["order", "sort"]:
+            # Handle order by
+            sort_order = 1 if "asc" in user_input.lower() else -1
+            # Find the attribute after "by" in the user input
+            if "by" in user_input.lower():
+                words = user_input.lower().split()
+                by_index = words.index("by")
+                if by_index + 1 < len(words):  # Ensure there's a word after "by"
+                    potential_sort_field = words[by_index + 1]
+                    if potential_sort_field in attributes:  # Validate it's an attribute
+                        sort_field = potential_sort_field
+                    else:
+                        raise ValueError(f"Field '{potential_sort_field}' after 'by' is not a valid attribute.")
+                else:
+                    raise ValueError("No field specified after 'by' for ordering.")
+            else:
+                # Default to a string or numeric attribute
+                sort_field = string_attribute or numeric_attribute
+            mongo_pipeline.append({
+                "$sort": {sort_field: sort_order}
+            })
+        elif keyword == "join":
+            # Handle join
+            if numeric_attribute:
+                mongo_pipeline.append({
+                    "$lookup": {
+                        "from": "other_collection",  # Replace with actual collection name
+                        "localField": numeric_attribute,
+                        "foreignField": "_id",
+                        "as": "joined_data"
+                    }
+                })
+        elif keyword == "find":
+            # Handle find
+            conditions = {attr: {"$exists": True} for attr in selected_attributes}
+            mongo_pipeline.append({"$match": conditions})
+
+    if not mongo_pipeline:
+        mongo_pipeline = [{"$match": {}}]
+
+    print(f"selected_attributes: {selected_attributes}")
+    print(f"mongo_pipeline: {mongo_pipeline}")
+
+    return mongo_pipeline

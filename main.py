@@ -1,6 +1,6 @@
 from mongodb.connection import connect_to_mongodb, upload_data_to_collection, check_and_drop_database
-from mongodb.queries import execute_mongo_query, execute_aggregation_query, print_all_data, display_first_five_rows
-from mongodb.query_parser import generate_mongo_query, generate_example_queries, execute_query_from_input, display_result
+from mongodb.queries import execute_mongo_query, execute_aggregation_query, print_all_data, display_sample_rows, display_columns
+from mongodb.query_parser import generate_mongo_query, generate_example_queries, execute_query_from_input, display_result, get_execute_query
 import pandas as pd
 
 
@@ -16,8 +16,8 @@ def main():
         {'collection_name' : "disney_movies+tvs_info",
         'file_path' : './data/disney_movies+tvs.csv'
         },
-        {'collection_name' : "banana_quality",
-        'file_path' : './data/banana_quality_dataset.csv'
+        {'collection_name' : "best_animated_films",
+        'file_path' : './data/best_animated_film_winners.csv'
         },
     ]
     ### Drop previous data
@@ -26,7 +26,6 @@ def main():
     db = connect_to_mongodb(uri, db_name)
     for collection in dbs:
         upload_data_to_collection(db, collection['collection_name'], collection['file_path'])
-    
     print("\n\n")
     print("\033[92m+\033[0m"*100)
     print("\n\033[92mWelcome to ChatDB!\033[0m ")
@@ -45,7 +44,6 @@ def main():
 
             try:
                 upload_data_to_collection(db, collection_name, file_path)
-                print("Data uploaded successfully!")
             except FileNotFoundError:
                 print("\033[91mError:\033[0m The file path you provided does not exist. Please check the path and try again.")
             except pd.errors.EmptyDataError:
@@ -60,43 +58,43 @@ def main():
                 print("\ncollections in database:")
                 for collection in collections:
                     print(f"- {collection}")
-                chosen_collection = input("Please input the exact name of the collection you wish to explore:")
                 while True:
                     try:
+                        chosen_collection = input("Please input the exact name of the collection you wish to explore:").strip()
                         if chosen_collection in collections:
-                            print(f"You have chosen \033[91m{chosen_collection}\033[0m")
+                            print(f"\nYou have chosen \033[91m{chosen_collection}\033[0m")
 
-                            display_first_five_rows(db, chosen_collection)
+                            display_sample_rows(db, chosen_collection)
+                            display_columns(db, chosen_collection)
 
                             ########################################
                             ### Official Query Stage
+                            return_to_main_menu = False
                             while True:
-                                print("\n\033[92mTry ask me for example queries (i.e. example mongo queries, average, group by, sum, total)\033[0m")
-                                user_input = input("prompt:")
-
-                                if user_input.lower() in ["exit", "quit"]:
-                                    print("Returning to main menu.")
+                                print("\n\033[92mPlease choose how you want to explore:\033[0m")
+                                print("1. Sample Queries")
+                                print("2. Your own Queries")
+                                print("3. Back<")
+                                option = input("\nEnter your choice (1/2/3): ")
+                                if option == "1":
+                                    get_execute_query(db,chosen_collection, random_query=True)
+                                elif option == "2":
+                                    # print('Working on this...')
+                                    get_execute_query(db,chosen_collection, random_query=False)
+                                elif option == "3":
+                                    return_to_main_menu = True
                                     break
 
-                                natural_language_query, mongo_query = generate_example_queries(user_input, db, chosen_collection)
-
-                                # Display the generated example query
-                                print(f"\n\033[92mExample Query:\033[0m {natural_language_query}")
-                                print(f"\033[92mMongoDB Query:\033[0m {mongo_query}")
-                                # print(mongo_query)
-
-                                # Execute the query if user wants me to
-                                execution = input("\n\033[92mDo you want me to execute the query for you? (y/n)\033[0m")
-                                if execution.lower().strip() == 'y':
-                                    results = execute_query_from_input(natural_language_query, db, chosen_collection)
-                                    display_result(results)
-                                else:
-                                    continue
                         else:
                             print(f"\033[91m{chosen_collection}\033[0m not in database") 
+                            return_to_main_menu = False
+                        
+                        if return_to_main_menu:
+                            break
 
                     except Exception as e:
-                        print(f"\033[91mError:\033[0m {e}")
+                        print(f"\033[91mError:\033[0m {e}") 
+
             else:
                 print("No datasets available in the database.")
 
