@@ -4,6 +4,7 @@ from nltk.corpus import stopwords
 from nltk import pos_tag
 import random
 import re
+from bson import ObjectId
 
 nltk.download('punkt')
 nltk.download('punkt_tab')
@@ -207,7 +208,6 @@ def get_execute_query(db, collection_name, random_query):
         natural_language_query = user_input
 
         mongo_pipeline = preprocess(natural_language_query, db, collection_name)
-    
         # Convert pipeline to string representation
         # query_string = convert_pipeline_to_string(db.name, collection_name, mongo_pipeline)
         # print(f"Generated Query: {query_string}")
@@ -221,9 +221,29 @@ def get_execute_query(db, collection_name, random_query):
         result = list(collection.aggregate(mongo_pipeline))
     except Exception as e:
         result = str(e)
-
+    if any("$lookup" in stage for stage in mongo_pipeline):
+        result = display_joined_data(result)
     display_result(result)
     return result
+
+def display_joined_data(results):
+    processed_results = []
+    for result in results:
+        if "joined_data" in result and isinstance(result["joined_data"], list) and result["joined_data"]:
+            if len(result["joined_data"]) == 1:
+                joined_doc = result["joined_data"][0]  # Extract the single document
+                del result["joined_data"]  # Remove the joined_data field
+                for key, value in joined_doc.items():
+                    if key not in result:
+                        result[key] = value
+            else:
+                result["joined_data_count"] = len(result["joined_data"])  # Add count of joined documents
+        else:
+            result.pop("joined_data", None)
+
+        processed_results.append(result)
+
+    return processed_results
 
 def display_result(query_result):
     # print(query_result)
@@ -337,23 +357,75 @@ def preprocess(user_input, db, collection_name):
             }
             mongo_pipeline.append(group_stage)
             mongo_pipeline.append(project_stage)
+        elif keyword == "group":
+            # Handle group by
+            group_field = next((word for word in tokens if word in selected_attributes), None)
+
+            if not group_field:
+                raise ValueError("No valid field found to group by.")
+
+            # Build the $group stage
+            group_stage = {
+                "$group": {
+                    "_id": {group_field: f"${group_field}"}
+                }
+            }
+
+            # Add the $group stage to the pipeline
+            mongo_pipeline.append(group_stage)
         elif keyword == "where":
             # Handle where conditions
+            tokens = word_tokenize(user_input)
             conditions = {}
-            where_col = next((col for col in selected_attributes if col in filtered_tokens), None)
+            where_col = next((col for col in selected_attributes if col in tokens), None)
+            # print(f"where_col: {where_col}")
             if where_col:
-                condition_operator = next((op for op in [">", "<", ">=", "<=", "="] if op in filtered_tokens), "=")
-                condition_value = next((val for val in filtered_tokens if val.replace(".", "", 1).isdigit()), None)
-                if condition_value:
-                    conditions[where_col] = {f"${condition_operator}": float(condition_value)}
+                # Map Python-style operators to MongoDB operators
+                operator_map = {
+                    "=": "$eq",
+                    ">": "$gt",
+                    "<": "$lt",
+                    ">=": "$gte",
+                    "<=": "$lte"
+                }
+
+                # Find the operator in the tokens
+                condition_operator = next((op for op in operator_map.keys() if op in tokens), None)
+
+                if condition_operator:
+                    # Find the value directly following the operator
+                    tokens = user_input.split()
+                    operator_index = tokens.index(condition_operator)
+                    if operator_index + 1 < len(tokens):  # Ensure there's a token after the operator
+                        condition_value = tokens[operator_index + 1]
+
+                        # Check if the value is numeric or should remain as a string
+                        try:
+                            # Attempt to convert to float if numeric
+                            condition_value = float(condition_value)
+                        except ValueError:
+                            # Leave it as a string if conversion fails
+                            pass
+
+                        # Map the operator to MongoDB syntax
+                        condition_operator_mongo = operator_map[condition_operator]
+                        conditions[where_col] = {condition_operator_mongo: condition_value}
+                    else:
+                        raise ValueError(f"No value provided after operator '{condition_operator}'.")
+                else:
+                    raise ValueError("Didn't find any operator")
+            
+            # Add the conditions to the pipeline
             mongo_pipeline.append({"$match": conditions})
+
         elif keyword in ["order", "sort"]:
             # Handle order by
             sort_order = 1 if "asc" in user_input.lower() else -1
             # Find the attribute after "by" in the user input
             if "by" in user_input.lower():
-                words = user_input.lower().split()
-                by_index = words.index("by")
+                words = user_input.split()
+                words_lower = user_input.lower().split()
+                by_index = words_lower.index("by")
                 if by_index + 1 < len(words):  # Ensure there's a word after "by"
                     potential_sort_field = words[by_index + 1]
                     if potential_sort_field in attributes:  # Validate it's an attribute
@@ -362,23 +434,105 @@ def preprocess(user_input, db, collection_name):
                         raise ValueError(f"Field '{potential_sort_field}' after 'by' is not a valid attribute.")
                 else:
                     raise ValueError("No field specified after 'by' for ordering.")
+                # Deal with project stage
+                order_index = words.index("order")
+                if order_index + 1 < len(words):  # Ensure there's a word after "by"
+                    potential_project_field = words[order_index + 1]
+                    # print(f"attributes: {attributes}")
+                    if potential_project_field in attributes:  # Validate it's an attribute
+                        project_field = potential_project_field
+                        mongo_pipeline.append({
+                            "$project": {project_field: 1,
+                                        sort_field: 1}
+                        })
+                    elif potential_project_field == 'by':
+                        sort_field = string_attribute or numeric_attribute
+                        mongo_pipeline.append({
+                            "$project": {sort_field: 1}
+                        })
+                    else:
+                        raise ValueError(f"Field '{potential_project_field}' after 'order' is not a valid attribute.")
+                else:
+                    raise ValueError("No field specified after 'order' for ordering.")
             else:
                 # Default to a string or numeric attribute
                 sort_field = string_attribute or numeric_attribute
+                mongo_pipeline.append({
+                    "$project": {sort_field: 1}
+                })
             mongo_pipeline.append({
                 "$sort": {sort_field: sort_order}
             })
+
+            
         elif keyword == "join":
-            # Handle join
-            if numeric_attribute:
-                mongo_pipeline.append({
-                    "$lookup": {
-                        "from": "other_collection",  # Replace with actual collection name
-                        "localField": numeric_attribute,
-                        "foreignField": "_id",
-                        "as": "joined_data"
-                    }
-                })
+            # Handle join operation
+            tokens = user_input.split()  # Tokenize the input for easier parsing
+
+            # Find the collection to join
+            if "join" in tokens:
+                join_index = tokens.index("join")
+                if join_index + 1 < len(tokens):  # Ensure there is a word after "join"
+                    join_collection = tokens[join_index + 1]
+                else:
+                    raise ValueError("No collection specified to join.")
+
+            # Find the fields to join on
+            if "on" in tokens:
+                on_index = tokens.index("on")
+                if on_index + 1 < len(tokens):  # Ensure there are words after "on"
+                    # Extract potential join conditions after 'on'
+                    join_conditions = tokens[on_index + 1:]
+                    local_attributes = attributes
+                    # foreign_attributes = get_collection_attributes(db, join_collection)
+                    # Look for 'and' separator
+                    if "and" in join_conditions:
+                        and_index = join_conditions.index("and")
+                        if and_index > 0 and and_index + 1 < len(join_conditions):
+                            if join_conditions[0] in local_attributes:
+                                local_field = join_conditions[0]
+                                foreign_field = join_conditions[and_index + 1]
+                            else:
+                                foreign_field = join_conditions[0]
+                                local_field = join_conditions[and_index + 1]
+                        else:
+                            raise ValueError("Invalid syntax for join conditions.")
+                    else:
+                        # If no 'and', assume a single condition and assign both to the same field
+                        if len(join_conditions) >= 2:
+                            local_field, foreign_field = join_conditions[0], join_conditions[1]
+                        else:
+                            raise ValueError("Insufficient attributes for join.")
+                else:
+                    raise ValueError("No fields specified after 'on' for the join.")
+            else:
+                raise ValueError("'on' keyword is missing in the join query.")
+
+            # Build the $lookup stage for MongoDB
+            join_stage = {
+                "$lookup": {
+                    "from": join_collection,   # The collection to join
+                    "localField": local_field,  # Field in the current collection
+                    "foreignField": foreign_field,  # Field in the joined collection
+                    "as": "joined_data"
+                }
+            }
+
+            # Add the $lookup stage to the pipeline
+            mongo_pipeline.append(join_stage)
+
+            # Add a $match stage to filter out documents where joined_data is empty
+            match_stage = {
+                "$match": {
+                    "joined_data": { "$ne": [] }
+                }
+            }
+
+            # Add the $match stage to the pipeline
+            mongo_pipeline.append(match_stage)
+
+        # elif keyword == "join":
+        #     raise ValueError("'join' is not incorporated in this program. Try a different query.")
         elif keyword == "find":
             # Handle find
             conditions = {attr: {"$exists": True} for attr in selected_attributes}

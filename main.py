@@ -1,5 +1,5 @@
 from mongodb.connection import connect_to_mongodb, upload_data_to_collection, check_and_drop_database
-from mongodb.queries import execute_mongo_query, execute_aggregation_query, print_all_data, display_sample_rows, display_columns
+from mongodb.queries import execute_mongo_query, execute_aggregation_query, print_all_data, display_sample_rows, display_columns, display_all_columns
 from mongodb.query_parser import generate_mongo_query, generate_example_queries, execute_query_from_input, display_result, get_execute_query
 import pandas as pd
 
@@ -70,24 +70,29 @@ def main():
                             ########################################
                             ### Official Query Stage
                             return_to_main_menu = False
-                            try:
-                                while True:
+                            
+                            while True:
+                                try:
                                     print("\n\033[92mPlease choose how you want to explore:\033[0m")
                                     print("1. Sample Queries")
                                     print("2. Your own Queries")
-                                    print("3. Back<")
-                                    option = input("\nEnter your choice (1/2/3): ")
+                                    print("3. View attributes for all collections")
+                                    print("4. Back<")
+                                    print(f"\nCurrent Collection: \033[91m{chosen_collection}\033[0m")
+                                    option = input("Enter your choice (1/2/3/4): ")
                                     if option == "1":
                                         get_execute_query(db,chosen_collection, random_query=True)
                                     elif option == "2":
                                         # print('Working on this...')
                                         get_execute_query(db,chosen_collection, random_query=False)
                                     elif option == "3":
+                                        display_all_columns(db)
+                                    elif option == "4":
                                         return_to_main_menu = True
                                         break
-                            except Exception as e:
-                                print(e)
-                                print('\n')
+                                except Exception as e:
+                                    print(e)
+                                    print('\n')
 
                         else:
                             print(f"\033[91m{chosen_collection}\033[0m not in database") 

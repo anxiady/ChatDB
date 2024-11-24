@@ -46,3 +46,21 @@ def display_columns(db, collection_name):
     print(f"Columns in '{collection_name}':")
     print(table)
 
+def display_all_columns(db):
+    collections = db.list_collection_names()
+
+    # Iterate through each collection
+    for collection_name in collections:
+        collection = db[collection_name]
+        sample_document = collection.find_one()  # Get a single document to infer schema
+
+        print(f"\nColumns in collection: {collection_name}")
+
+        # Display column names and types
+        table = PrettyTable()
+        table.field_names = ["Column Name", "Type"]
+
+        for key, value in sample_document.items():
+            table.add_row([key, type(value).__name__])
+
+        print(table)
