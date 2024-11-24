@@ -70,20 +70,24 @@ def main():
                             ########################################
                             ### Official Query Stage
                             return_to_main_menu = False
-                            while True:
-                                print("\n\033[92mPlease choose how you want to explore:\033[0m")
-                                print("1. Sample Queries")
-                                print("2. Your own Queries")
-                                print("3. Back<")
-                                option = input("\nEnter your choice (1/2/3): ")
-                                if option == "1":
-                                    get_execute_query(db,chosen_collection, random_query=True)
-                                elif option == "2":
-                                    # print('Working on this...')
-                                    get_execute_query(db,chosen_collection, random_query=False)
-                                elif option == "3":
-                                    return_to_main_menu = True
-                                    break
+                            try:
+                                while True:
+                                    print("\n\033[92mPlease choose how you want to explore:\033[0m")
+                                    print("1. Sample Queries")
+                                    print("2. Your own Queries")
+                                    print("3. Back<")
+                                    option = input("\nEnter your choice (1/2/3): ")
+                                    if option == "1":
+                                        get_execute_query(db,chosen_collection, random_query=True)
+                                    elif option == "2":
+                                        # print('Working on this...')
+                                        get_execute_query(db,chosen_collection, random_query=False)
+                                    elif option == "3":
+                                        return_to_main_menu = True
+                                        break
+                            except Exception as e:
+                                print(e)
+                                print('\n')
 
                         else:
                             print(f"\033[91m{chosen_collection}\033[0m not in database") 
