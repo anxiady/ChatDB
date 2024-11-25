@@ -12,13 +12,13 @@ def main():
     ### Data Upload
     db_name = "chatdb"
     dbs = [
-        {'collection_name' : "disney_movie_stats",
+        {'collection_name' : "disney_movies",
         'file_path' : './data/disney_movie_stats.json'
         },
-        {'collection_name' : "disney_movies+tvs_info",
+        {'collection_name' : "disney_movies+tvs",
         'file_path' : './data/disney_movies+tvs.json'
         },
-        {'collection_name' : "best_animated_films",
+        {'collection_name' : "best_animated",
         'file_path' : './data/best_animated_film_winners.json'
         },
     ]

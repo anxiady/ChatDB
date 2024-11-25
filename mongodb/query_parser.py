@@ -219,9 +219,12 @@ def preprocess(user_input, db, collection_name):
 
     # Identify keywords and attributes in the user input
     keywords = []
-    for key in ["sum", "total", "average", "count", "group", "where", "order", "find", "join", "max", "min", "sort"]:
-        if key in user_input.lower():
+    for key in ["sum", "total", "average", "count", "group", "where", "order", "find", "join", "max", "min", "sort", "how many"]:
+        if key in tokens:
             keywords.append(key)
+    
+    if "how many" in user_input.lower():
+        keywords.append("how many")
 
     # Identify the attributes present in the user input
     selected_attributes = [attr for attr in attributes if re.search(rf"\b{attr}\b", user_input, re.IGNORECASE)]
@@ -266,22 +269,43 @@ def preprocess(user_input, db, collection_name):
                 mongo_pipeline.append(project_stage)
             else:
                 print(f"Cannot perform '{keyword}' on non-numeric fields.")
-        elif keyword == "count":
+        elif keyword in ["count", "how many"]:
             # Handle count
-            group_stage = {
-                "$group": {
-                    "_id": {string_attribute: f"${string_attribute}"} if string_attribute else None,
-                    "count": {"$sum": 1},
-                }
-            }
-            project_stage = {
-                "$project": {
-                    "count": 1,
-                    string_attribute: 1 if string_attribute else None,
-                }
-            }
-            mongo_pipeline.append(group_stage)
-            mongo_pipeline.append(project_stage)
+            if 'unique' in tokens or 'different' in tokens:
+                # Count unique items in a string attribute
+                if string_attribute:
+                    group_stage = {
+                        "$group": {
+                            "_id": f"${string_attribute}"  # Group by the unique string attribute
+                        }
+                    }
+                    count_stage = {
+                        "$count": "unique_count"  # Count the number of unique groups
+                    }
+                    mongo_pipeline.append(group_stage)
+                    mongo_pipeline.append(count_stage)
+                else:
+                    raise ValueError("A valid string attribute is required to count unique values.")
+            else:
+                # Count occurrences of each item
+                if string_attribute:
+                    group_stage = {
+                        "$group": {
+                            "_id": f"${string_attribute}",  # Group by the string attribute
+                            "count": {"$sum": 1},  # Count occurrences
+                        }
+                    }
+                    project_stage = {
+                        "$project": {
+                            "count": 1,
+                            string_attribute: 1  # Include the string attribute in the output
+                        }
+                    }
+                    mongo_pipeline.append(group_stage)
+                    mongo_pipeline.append(project_stage)
+                else:
+                    raise ValueError("A valid string attribute is required to count occurrences.")
+
         elif keyword == "group":
             # Handle group by
             group_field = next((word for word in tokens if word in selected_attributes), None)
@@ -289,21 +313,29 @@ def preprocess(user_input, db, collection_name):
             if not group_field:
                 raise ValueError("No valid field found to group by.")
 
-            # Build the $group stage
             group_stage = {
                 "$group": {
-                    "_id": {group_field: f"${group_field}"}
+                    "_id": f"${group_field}"
                 }
             }
-
-            # Add the $group stage to the pipeline
             mongo_pipeline.append(group_stage)
+
         elif keyword == "where":
             # Handle where conditions
             tokens = word_tokenize(user_input)
             conditions = {}
-            where_col = next((col for col in selected_attributes if col in tokens), None)
-            # print(f"where_col: {where_col}")
+            # where_col = next((col for col in selected_attributes if col in tokens), None)
+            if "where" in tokens:
+                where_index = tokens.index("where")  # Find the index of "where"
+                if where_index + 1 < len(tokens):  # Ensure there's a word after "where"
+                    where_col = tokens[where_index + 1]  # Get the word directly after "where"
+                    # Validate that the word is a valid attribute
+                    where_col = where_col if where_col in selected_attributes else None
+                else:
+                    raise ValueError("No attribute specified after 'where'.")
+            else:
+                where_col = None
+            print(f"where_col: {where_col}")
             if where_col:
                 # Map Python-style operators to MongoDB operators
                 operator_map = {
@@ -339,9 +371,14 @@ def preprocess(user_input, db, collection_name):
                         raise ValueError(f"No value provided after operator '{condition_operator}'.")
                 else:
                     raise ValueError("Didn't find any operator")
-            
-            # Add the conditions to the pipeline
+                
             mongo_pipeline.append({"$match": conditions})
+
+            if "find" in keywords:
+                project_stage = {
+                    "$project": {attr: 1 for attr in selected_attributes}
+                }
+                mongo_pipeline.append(project_stage)
 
         elif keyword in ["order", "sort"]:
             # Handle order by
@@ -360,21 +397,33 @@ def preprocess(user_input, db, collection_name):
                 else:
                     raise ValueError("No field specified after 'by' for ordering.")
                 # Deal with project stage
-                order_index = words.index("order")
-                if order_index + 1 < len(words):  # Ensure there's a word after "by"
+                if keyword == "order":
+                    order_index = words.index("order")
+                else:
+                    order_index = words.index("sort")
+                if order_index + 1 < len(words):  # Ensure there's a word after "order"
+                    print(f"potential sort: {potential_sort_field}")
+                    print(f"sort: {sort_field}")
                     potential_project_field = words[order_index + 1]
                     # print(f"attributes: {attributes}")
                     if potential_project_field in attributes:  # Validate it's an attribute
                         project_field = potential_project_field
+                        # if "find" in keywords:
+                        #     project_stage = {
+                        #         "$project": {attr: 1 for attr in selected_attributes}
+                        #     }
+                        #     mongo_pipeline.append(project_stage)
                         mongo_pipeline.append({
                             "$project": {project_field: 1,
                                         sort_field: 1}
                         })
                     elif potential_project_field == 'by':
-                        sort_field = string_attribute or numeric_attribute
-                        mongo_pipeline.append({
-                            "$project": {sort_field: 1}
-                        })
+                        sort_field = potential_sort_field
+                        # sort_field = string_attribute or numeric_attribute
+                        # mongo_pipeline.append({
+                        #     "$project": {sort_field: 1}
+                        # })
+                        
                     else:
                         raise ValueError(f"Field '{potential_project_field}' after 'order' is not a valid attribute.")
                 else:
@@ -382,12 +431,19 @@ def preprocess(user_input, db, collection_name):
             else:
                 # Default to a string or numeric attribute
                 sort_field = string_attribute or numeric_attribute
-                mongo_pipeline.append({
-                    "$project": {sort_field: 1}
-                })
+                # mongo_pipeline.append({
+                #     "$project": {sort_field: 1}
+                # })
             mongo_pipeline.append({
                 "$sort": {sort_field: sort_order}
             })
+            if "find" in keywords:
+                project_stage = {
+                    "$project": {attr: 1 for attr in selected_attributes}
+                }
+                mongo_pipeline.append(project_stage)
+            # print(f"potential sort: {potential_sort_field}")
+            print(f"sort: {sort_field}")
 
             
         elif keyword == "join":
@@ -420,6 +476,17 @@ def preprocess(user_input, db, collection_name):
                             else:
                                 foreign_field = join_conditions[0]
                                 local_field = join_conditions[and_index + 1]
+                        else:
+                            raise ValueError("Invalid syntax for join conditions.")
+                    elif "with" in join_conditions:
+                        with_index = join_conditions.index("with")
+                        if with_index > 0 and with_index + 1 < len(join_conditions):
+                            if join_conditions[0] in local_attributes:
+                                local_field = join_conditions[0]
+                                foreign_field = join_conditions[with_index + 1]
+                            else:
+                                foreign_field = join_conditions[0]
+                                local_field = join_conditions[with_index + 1]
                         else:
                             raise ValueError("Invalid syntax for join conditions.")
                     else:
@@ -458,10 +525,16 @@ def preprocess(user_input, db, collection_name):
 
         # elif keyword == "join":
         #     raise ValueError("'join' is not incorporated in this program. Try a different query.")
-        elif keyword == "find":
+        elif keyword == "find" and "where" not in keywords and "order" not in keywords and "sort" not in keywords:
             # Handle find
             conditions = {attr: {"$exists": True} for attr in selected_attributes}
             mongo_pipeline.append({"$match": conditions})
+            project_stage = {
+                "$project": {attr: 1 for attr in selected_attributes}
+            }
+            print(f"conditions: {conditions}")
+            print(f"project_Stage: {project_stage}")
+            mongo_pipeline.append(project_stage)
 
     if not mongo_pipeline:
         mongo_pipeline = [{"$match": {}}]
