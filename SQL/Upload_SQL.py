@@ -8,16 +8,20 @@ import os
 
 def upload_sql(connection):
 
-    file_path = input("Enter the CSV filename to upload to SQL: ")
+    file_path = input("Enter the CSV filename to upload to SQL: (Type 'Exit' to leave.) ")
+
+    if file_path.lower() == 'exit':
+        return[]
+    
 
     if not os.path.isfile(file_path):
         print(f"Error: File '{file_path}' not found. Check for any typos")
         return
-
-    table = os.path.splitext(os.path.basename(file_path))[0]
+    # replace any spaces 
+    table = os.path.splitext(os.path.basename(file_path))[0].replace(' ', '_')
     #db = 'SQL_Datasets'
     user = 'root'
-    password = '111111'
+    password = 'Dsci-551'
     host = 'localhost'
     port = 3306
 
@@ -40,7 +44,7 @@ def upload_sql(connection):
             cursor.execute(f"Use `{db}`")
             break
         elif db_choice.lower() == 'new':
-            new_db = input("Enter the name of the new database: ").strip()
+            new_db = input("Enter the name of the new database: ").strip().replace(' ', '_')
             cursor.execute(f"Create database if not exists `{new_db}`")
             cursor.execute(f"Use `{new_db}`")
             db = new_db
@@ -65,8 +69,10 @@ def upload_sql(connection):
             else:
                 print("Invalid input. Please enter 'yes' or 'no' only")
 
-    engine = create_engine(f'mysql+pymysql://{user}:{password}@{host}:{port}/{db}')
+    
     data = pd.read_csv(file_path, encoding = 'ISO-8859-1')
+    data.columns = [col.replace(' ', '_') for col in data.columns]
+    engine = create_engine(f'mysql+pymysql://{user}:{password}@{host}:{port}/{db}')
     data.to_sql(name = table, con = engine, if_exists = 'replace', index = False)
 
     print(f"'{file_path} has been successfully uploaded as '{table}' table in database '{db}'")
