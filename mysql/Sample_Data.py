@@ -36,7 +36,10 @@ def sql_sample_data(connection):
 
 
     while True:
-        selected_table = input("\nEnter name of table you want to view sample data from: ").strip()
+        selected_table = input("\nEnter name of table you want to view sample data from: (Type Exit to leave) ").strip()
+        if selected_table.lower() == 'exit':
+            return[]
+        
 
         if selected_table in table_columns:
             break

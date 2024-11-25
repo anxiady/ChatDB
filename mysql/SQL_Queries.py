@@ -56,27 +56,31 @@ def connect_to_SQL(selected_db = None):
             
 
 def preprocess(user_input):
-
+    queries = ['having', 'order', 'group', 'max', 'min', 'sum', 'avg', 'count', 'where', 'select']
     tokens = re.findall(r'<=|>=|=|<|>|\w+[\w_/.\-]*', user_input)
-    filtered_tokens = [token.lower() for token in tokens]
+  
+    filtered_tokens = [token.lower() if token.lower() in queries else token for token in tokens]
     return filtered_tokens
 
 def preprocess_keywords(tokens, mapping):
 
     processed_tokens = []
     i = 0
+
+    lowercase = {key.lower(): value for key, value in mapping.items()}
+    
     while i < len(tokens):
         match = False
-        for phrase, value in mapping.items():
-            phrase_tokens = phrase.lower().split()
-            if tokens[i:i + len(phrase_tokens)] == phrase_tokens:
+        for phrase, value in lowercase.items():
+            phrase_tokens = phrase.split()
+            if [token.lower() for token in tokens[i:i + len(phrase_tokens)]] == phrase_tokens:
                 processed_tokens.append(value)
                 i += len(phrase_tokens)
                 match = True
                 break
     
         if not match:
-            processed_tokens.append(mapping.get(tokens[i].lower(), tokens[i]))
+            processed_tokens.append(lowercase.get(tokens[i].lower(), tokens[i]))
             i += 1
     #print(processed_tokens)
     return processed_tokens
@@ -96,17 +100,20 @@ def column_types(cursor, table):
 def get_column_matches(user_input, cursor):
 
     filtered_tokens = preprocess(user_input)
+    #print(filtered_tokens)
     cursor.execute("Show Tables")
     tables = [row[0] for row in cursor.fetchall()]
     all_columns = {}
 
     for table in tables:
         columns, numeric_columns, categorical_columns = column_types(cursor, table)
+        #print(columns)
         all_columns[table] = columns
 
     matched_columns = {}
     for table, columns in all_columns.items():
-        matching_columns = [col for col in columns if col in filtered_tokens]
+        matching_columns = [col for col in filtered_tokens if col in columns]
+        #print(matching_columns)
         if matching_columns:
             matched_columns[table] = matching_columns
     return matched_columns
@@ -116,10 +123,14 @@ def get_table(user_input, cursor):
 
     matched_columns = get_column_matches(user_input, cursor)
     if matched_columns:
+        number_matches = {}
         for table, columns in matched_columns.items():
-            columns, numeric_columns, categorical_columns = column_types(cursor, table)
-            return table, columns, numeric_columns, categorical_columns
-
+            matches = len(columns)
+            number_matches[table] = matches
+        closest_table = max(number_matches, key = number_matches.get)
+        columns, numeric_columns, categorical_columns = column_types(cursor, closest_table)
+        return closest_table, columns, numeric_columns, categorical_columns
+    
     cursor.execute("Show Tables")
     tables = [table[0] for table in cursor.fetchall()]
 
@@ -201,19 +212,19 @@ def get_having_clause(cursor, table_choice, numeric_columns, categorical_columns
     return agg_function, having_col, having_condition, having_value
 
 
-def get_order_clause(cursor, table_choice, numeric_columns, random_queries, order_tokens = None, filtered_tokens = None):
+def get_order_clause(cursor, table_choice, categorical_columns, numeric_columns, random_queries, order_tokens = None, filtered_tokens = None):
     
     order_col, order_type, limit_value = None, None, None
 
     if random_queries: 
         
-        order_col = random.choice(numeric_columns)
+        order_col = random.choice(numeric_columns + categorical_columns)
         limit_value = random.randint(1, 10) if random.choice([True, False]) else None
         order_type = random.choice(['ASC', 'DESC'])
     
     else:
         
-        order_col = next((col for col in order_tokens if col in numeric_columns), None)      
+        order_col = next((col for col in order_tokens if col in numeric_columns + categorical_columns), None)      
         if any(token in filtered_tokens for token in ['bottom', 'ascending', 'asc']):
             order_type = 'ASC'     
         if any(token in filtered_tokens for token in ['top', 'descending', 'desc']):
@@ -274,10 +285,26 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
         return []
 
     if random_queries:
-        user_input = input("What kind of query would you like to see or would you like ChatDB to generate one?").strip().lower()
+        print(f"Note: Available queries are ‘select’ , ‘where’, ‘group by’ with aggregate "
+                      f"function (‘MAX’, ‘MIN’, ‘SUM’, ’COUNT’, ‘AVG’) , aggregate functions "
+                      f"alone, ‘having’, ‘order by …. limit’, ‘where … group by … having’, and "
+                      f"‘where … order by …. limit’. When asking for sample queries and writing "
+                      f"your own in natural language, please try to include one of those "
+                      f"keywords so our NLP can process your question.")
+        user_input = input("\nWhat kind of query would you like to see or would you like ChatDB to generate one? (Type 'Exit' to leave.) ").strip()
+        print(f"")
 
     else:
-        user_input = input("Ask a question: ").strip()
+        print(f"Note: Available query NLP are ‘select ... table_name’ , ‘where’, ‘group by’ with aggregate "
+                      f"function (‘MAX’, ‘MIN’, ‘SUM’, ’COUNT’, ‘AVG’) , aggregate functions "
+                      f"alone, ‘group by... having... aggregate function(column)’, ‘order by …. limit’, ‘where … group by … having... aggregate_function(column)’, and "
+                      f"‘where … order by …. limit’. When asking for sample queries and writing "
+                      f"your own in natural language, please try to include one of those "
+                      f"keywords so our NLP can process your question. Table columns are CASE SENSITIVE.")
+        user_input = input("\nAsk a question: (Type 'Exit' to leave.) ").strip()
+
+    if user_input.lower() == 'exit':
+        return[]
         
     table_choice = None
     while table_choice is None:
@@ -293,30 +320,28 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
 
     
     columns, numeric_columns, categorical_columns = column_types(cursor, table_choice)
-    #print(numeric_columns)
-    #print(categorical_columns)
-    
+
 
         
-    queries = ['having', 'order', 'group', 'MAX', 'MIN', 'SUM', 'AVG', 'count', 'where', 'select']
+    queries = ['having', 'order', 'group', 'max', 'min', 'sum', 'avg', 'count', 'where', 'select']
     conditions = ['>', '<', '=', '<=', '>=']
     condition_text = {'>': 'greater than', '<': 'less than', '=': 'equal to', '<=': 'less than or equal to', '>=': 'greater than or equal to'}
-    agg_functions = ['AVG', 'SUM', 'MAX', 'MIN', 'COUNT']
-    agg_text = {'AVG': 'average', 'SUM': 'sum', 'MAX': 'maximum', 'MIN': 'minimum', 'COUNT': 'count'}
+    agg_functions = ['avg', 'sum', 'max', 'min', 'count']
+    agg_text = {'avg': 'average', 'sum': 'sum', 'max': 'maximum', 'min': 'minimum', 'count': 'count'}
     limit_text = {'ASC': 'Bottom', 'DESC': 'Top'}
     keyword_mapping = {'less than or equal to': '<=', 'greater than or equal to': '>=', 'more than or equal to': '>=', 'greater than': '>', 'more than': '>', 'less than': '<', 
-                       'equal to': '=', 'is': '=', 'are': '=', 'average': 'AVG', 'maximum': 'MAX', 'minimum': 'MIN', 'total': 'SUM',
+                       'equal to': '=', 'is': '=', 'are': '=', 'average': 'avg', 'maximum': 'max', 'minimum': 'min', 'total': 'sum',
                       'find': 'select', 'show': 'select', 'grouped': 'group'}
     
    
 
     filtered_tokens = preprocess(user_input)
     filtered_tokens = preprocess_keywords(filtered_tokens, keyword_mapping)
-    print(filtered_tokens)
+    #print(filtered_tokens)
     sample_queries = []
 
     specific_query = [query for query in queries if query in filtered_tokens]
-    print(specific_query)
+    #print(specific_query)
   
 
     if random_queries:
@@ -331,6 +356,7 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
     else:
         if specific_query:
             selected_queries = specific_query[:num_queries]
+            #print(selected_queries)
   
             
         else:
@@ -346,7 +372,6 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
 
         nl, query = None, None
 
-
         # where and having 
         if 'where' in specific_query and 'having' in specific_query and numeric_columns and categorical_columns:
 
@@ -354,6 +379,7 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                 where_col, where_condition, where_value = get_where_clause(cursor, table_choice, numeric_columns, categorical_columns, columns, random_queries, conditions)
                 agg_function, having_col, having_condition, having_value = get_having_clause(cursor, table_choice, numeric_columns, categorical_columns, columns, random_queries, conditions, agg_functions)
                 group_col = random.choice(categorical_columns)
+             
                 
             else: 
                 where_index = filtered_tokens.index('where') if 'where' in filtered_tokens else None
@@ -385,21 +411,21 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                     agg_function, having_col, having_condition, having_value = get_having_clause(cursor, table_choice, numeric_columns, categorical_columns, columns, random_queries, conditions, agg_functions, having_tokens)
                     group_col = next((col for col in categorical_columns if col in group_tokens))
                 
-                #print(f"where_col: {where_col} where_condition: {where_condition} where_value: {where_value} group_col: {group_col} having_col: {having_col} agg_function: {agg_function} having_condition: {having_condition} having_values: {having_value}")
+                print(f"where_col: {where_col} where_condition: {where_condition} where_value: {where_value} group_col: {group_col} having_col: {having_col} agg_function: {agg_function} having_condition: {having_condition} having_values: {having_value}")
 
-                    if (where_col is not None and where_condition is not None and where_value is not None and group_col is not None and having_col is not None and agg_function is not None and having_condition is not None and having_value is not None):
+            if (where_col is not None and where_condition is not None and where_value is not None and group_col is not None and having_col is not None and agg_function is not None and having_condition is not None and having_value is not None):
 
-                        if where_col in categorical_columns:
+                    if where_col in categorical_columns:
                             where_value = f"'{where_value}'"
 
-                        if having_col in categorical_columns:
+                    if having_col in categorical_columns:
                             having_value = f"'{having_value}'"
                     
-                        query = (f"Select `{group_col}`, {agg_function}(`{having_col}`) as `{agg_text[agg_function]}_{having_col}` "
+                    query = (f"Select `{group_col}`, {agg_function}(`{having_col}`) as `{agg_text[agg_function]}_{having_col}` "
                                 f"From `{table_choice}` where `{where_col}` {where_condition} {where_value} "
                                 f"Group by `{group_col}` having {agg_function}(`{having_col}`) {having_condition} {having_value};")
 
-                        nl = (f"{agg_text[agg_function]} of {having_col} in {table_choice} grouped by {group_col} "
+                    nl = (f"{agg_text[agg_function]} of {having_col} in {table_choice} grouped by {group_col} "
                               f"having {agg_text[agg_function]} of {having_col} {condition_text[having_condition]} {having_value} "
                               f"where {where_col} is {condition_text[where_condition]} {where_value}")
                 
@@ -414,7 +440,7 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
 
             if random_queries:
                 where_col, where_condition, where_value = get_where_clause(cursor, table_choice, numeric_columns, categorical_columns, columns, random_queries, conditions)
-                order_col, order_type, limit_value = get_order_clause(cursor, table_choice, numeric_columns, random_queries)
+                order_col, order_type, limit_value = get_order_clause(cursor, table_choice, categorical_columns, numeric_columns, random_queries)
                 columns_used = ', '.join(random.sample(columns, k = min(2, len(columns))))
             else:
                 where_index = filtered_tokens.index('where')   
@@ -428,7 +454,7 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                     where_tokens = filtered_tokens[where_index + 1:]
 
                 where_col, where_condition, where_value = get_where_clause(cursor, table_choice, numeric_columns, categorical_columns, columns, random_queries, conditions, where_tokens)
-                order_col, order_type, limit_value = get_order_clause(cursor, table_choice, numeric_columns, random_queries, order_tokens, filtered_tokens)
+                order_col, order_type, limit_value = get_order_clause(cursor, table_choice, categorical_columns, numeric_columns, random_queries, order_tokens, filtered_tokens)
                 columns_used = ', '.join(set(col for col in filtered_tokens if col in numeric_columns + categorical_columns))
 
             if limit_value is not None and where_value is not None and str(limit_value) == str(where_value):
@@ -469,7 +495,7 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
             else:
                 agg_col = next((col for col in numeric_columns if col in filtered_tokens), None)
                 group_col = next((col for col in categorical_columns if col in filtered_tokens), None)
-                agg_function = next((token.upper() for token in filtered_tokens if token.upper() in agg_functions), None)
+                agg_function = next((token for token in filtered_tokens if token in agg_functions), None)
                 condition = next((cond for cond in conditions if cond in filtered_tokens), None)    
                 value = next((v for v in filtered_tokens if v.replace('.', '', 1).isdigit()), None)
 
@@ -484,12 +510,12 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
         
             
         # group by and aggregate functions combined
-        elif any(token in specific_query for token in ['GROUP'] + agg_functions) and numeric_columns and categorical_columns:
+        elif 'group' in specific_query or 'max' in specific_query or 'min' in specific_query or 'sum' in specific_query or 'avg' in specific_query or 'count' in specific_query and numeric_columns and categorical_columns:
             condition = None
             value = None
             if random_queries:
-                agg_function = next((token.upper() for token in filtered_tokens if token.upper() in agg_functions), random.choice(agg_functions))
-                if agg_function == 'COUNT':
+                agg_function = next((token for token in filtered_tokens if token in agg_functions), random.choice(agg_functions))
+                if agg_function == 'count':
                     agg_col = random.choice(numeric_columns+categorical_columns)
                     if agg_col in numeric_columns:
                         condition, value = condition_value(cursor, agg_col, table_choice, conditions)
@@ -498,10 +524,10 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                 group_col = random.choice(categorical_columns)
 
             else:
-                agg_function = next((token.upper() for token in filtered_tokens if token.upper() in agg_functions), None)
+                agg_function = next((token for token in filtered_tokens if token in agg_functions), None)
                 if 'group' in filtered_tokens:
                     group_index = filtered_tokens.index('group') 
-                    if agg_function == 'COUNT':
+                    if agg_function == 'count':
                         agg_cols = [col for col in filtered_tokens[:group_index] if col in numeric_columns+categorical_columns]
                     else:
                         agg_cols = [col for col in filtered_tokens[:group_index] if col in numeric_columns]
@@ -511,31 +537,30 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                 else:
                     group_col = None
                     agg_col = next((col for col in filtered_tokens if col in numeric_columns), None)
-                if agg_function == 'COUNT':
+                if agg_function == 'count':
                     condition = next((cond for cond in conditions if cond in filtered_tokens), None)  
                     value = next((v for v in filtered_tokens if v.replace('.', '', 1).isdigit()), None)
-               
-         
             #print(agg_col," ", agg_function, " ", group_col,  " ", condition, " ",value)
+            if agg_function is None or agg_col is None:
+                print("Failed to recognize column, condition, or value for aggregate and group by clause.\n")
+                return
 
-            if agg_function == 'COUNT' and agg_col in numeric_columns and group_col:
-                query = f"Select `{group_col}`, COUNT(`{agg_col}`) as count_`{agg_col}` from `{table_choice}` where `{agg_col}` {condition} {value} group by `{group_col}`;"
+            if agg_function == 'count' and agg_col in numeric_columns and group_col:
+                query = f"Select {group_col}, count({agg_col}) as count_{agg_col} from {table_choice} where {agg_col} {condition} {value} group by `{group_col}`;"
                 nl = f"Count of {agg_col} in {table_choice} group by {group_col} where {agg_col} is {condition_text[condition]} {value}"
         
 
-            elif (agg_function == 'COUNT' and agg_col in categorical_columns) or (agg_function!= 'COUNT' and group_col and agg_col):
+            elif (agg_function == 'count' and agg_col in categorical_columns) or (agg_function!= 'count' and group_col and agg_col):
                 query = f"Select {group_col}, {agg_function}({agg_col}) as {agg_function}_{agg_col} from {table_choice} group by {group_col};"
                 nl = f"{agg_text[agg_function]} of {agg_col} group by {group_col}"
              
               
 
-            elif agg_function in ['SUM', 'AVG', 'MAX', 'MIN'] and agg_col in numeric_columns and not group_col:
+            elif agg_function in ['sum', 'avg', 'max', 'min'] and agg_col in numeric_columns and not group_col:
                 query = f"Select {agg_function}({agg_col}) as {agg_function}_{agg_col} from {table_choice};"
                 nl = f"{agg_text[agg_function]} of {agg_col} in {table_choice}"
 
-            if nl is None or query is None:
-                print("Failed to recognize column, condition, or value for aggregate and group by clause.\n")
-                return
+       
         
 
                # where
@@ -550,9 +575,10 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                 columns_used = ', '.join(set(col for col in filtered_tokens if col in numeric_columns + categorical_columns))
                 where_col, where_condition, where_value = get_where_clause(cursor, table_choice, numeric_columns, categorical_columns, columns, random_queries, conditions, where_tokens)
                     
-                #print(f"Condition: {where_condition}, Value: {where_value}, agg_col: {where_col}, columns_used: {columns_used}")
-    
-            if where_col and where_condition and where_value:
+                print(f"Condition: {where_condition}, Value: {where_value}, agg_col: {where_col}, columns_used: {columns_used}")
+
+            
+            if where_col is not None and where_condition is not None and where_value is not None:
 
                 if where_col in categorical_columns:
                     where_value = f"'{where_value}'"
@@ -560,25 +586,24 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                 query = f"Select {columns_used} from {table_choice} where {where_col} {where_condition} {where_value};"
                 nl = f"Select {columns_used} from {table_choice} where {where_col} is {condition_text[where_condition]} {where_value}"
             
-
-            if nl is None or query is None:
+            if nl is None and query is None:
                 print("Failed to recognize column, condition, or value for where clause.\n")
                 return
-
+        
 
 
     # order by    
         elif query_i == 'order' and numeric_columns:
             if random_queries:
                 columns_used = ', '.join(random.sample(columns, k = min(2, len(columns))))
-                order_col, order_type, limit_value = get_order_clause(cursor, table_choice, numeric_columns, random_queries)
+                order_col, order_type, limit_value = get_order_clause(cursor, table_choice, categorical_columns, numeric_columns, random_queries)
             
             else:
                 order_index = filtered_tokens.index('order')
                 order_tokens = filtered_tokens[order_index:]
 
                 columns_used = ', '.join(set(col for col in numeric_columns+categorical_columns if col in filtered_tokens))
-                order_col, order_type, limit_value = get_order_clause(cursor, table_choice, numeric_columns, random_queries, order_tokens, filtered_tokens)
+                order_col, order_type, limit_value = get_order_clause(cursor, table_choice, categorical_columns, numeric_columns, random_queries, order_tokens, filtered_tokens)
 
                 #print(columns_used, " ", order_col, " ", value, " ", order_type)
             
@@ -608,7 +633,7 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                     if filtered_columns:
                         columns_used = ', '.join(set(filtered_columns))
                     else:
-                        print("Failed to recognize column, condition, or value for where and order clause.")
+                        print("Failed to recognize column, condition, or value for select clause.")
                         return
 
         
@@ -643,7 +668,7 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                       f"NL Description: {nl}\n"
                       f"\n"
                       f"Query: {query}\n")
-            execute_query(cursor, query, i)
+                execute_query(cursor, query, i)
 
         else:
             print("\nQuery\n")
@@ -653,7 +678,7 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                       f"NL Description: {nl}\n"
                       f"\n"
                       f"Query: {query}\n")
-            execute_query(cursor, query, i)
+                execute_query(cursor, query, i)
 
      
                 
