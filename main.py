@@ -2,11 +2,13 @@ from mongodb.connection import connect_to_mongodb, upload_data_to_collection, ch
 from mongodb.queries import execute_mongo_query, execute_aggregation_query, print_all_data, display_sample_rows, display_columns, display_all_columns
 from mongodb.query_parser import generate_mongo_query, generate_example_queries, execute_query_from_input, display_result, get_execute_query
 import pandas as pd
+import os
+
 
 
 def main():
     uri = "mongodb://localhost:27017"
-
+    # print(os.getcwd())
     ### Data Upload
     db_name = "chatdb"
     dbs = [

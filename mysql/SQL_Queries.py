@@ -21,7 +21,7 @@ nltk.download('averaged_perceptron_tagger_eng')
 def connect_to_SQL(selected_db = None):
 
     user = 'root'
-    password = '111111'
+    password = 'Dsci-551'
     host = 'localhost'
     port = 3306
 

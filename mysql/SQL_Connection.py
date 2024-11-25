@@ -17,7 +17,7 @@ def upload_sql(connection):
     table = os.path.splitext(os.path.basename(file_path))[0]
     #db = 'SQL_Datasets'
     user = 'root'
-    password = '111111'
+    password = 'Dsci-551'
     host = 'localhost'
     port = 3306
 
