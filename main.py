@@ -1,6 +1,6 @@
 from mongodb.connection import connect_to_mongodb, upload_data_to_collection, check_and_drop_database
-from mongodb.queries import execute_mongo_query, execute_aggregation_query, print_all_data, display_sample_rows, display_columns, display_all_columns
-from mongodb.query_parser import generate_mongo_query, generate_example_queries, execute_query_from_input, display_result, get_execute_query
+from mongodb.queries import display_sample_rows, display_columns, display_all_columns
+from mongodb.query_parser import get_execute_query
 import pandas as pd
 import os
 
@@ -13,13 +13,13 @@ def main():
     db_name = "chatdb"
     dbs = [
         {'collection_name' : "disney_movie_stats",
-        'file_path' : './data/disney_movie_stats.csv'
+        'file_path' : './data/disney_movie_stats.json'
         },
         {'collection_name' : "disney_movies+tvs_info",
-        'file_path' : './data/disney_movies+tvs.csv'
+        'file_path' : './data/disney_movies+tvs.json'
         },
         {'collection_name' : "best_animated_films",
-        'file_path' : './data/best_animated_film_winners.csv'
+        'file_path' : './data/best_animated_film_winners.json'
         },
     ]
     ### Drop previous data

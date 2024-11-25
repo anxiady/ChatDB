@@ -12,7 +12,7 @@ def upload_data_to_collection(db, collection_name, file_path):
         return
 
     collection = db[collection_name]
-    data = pd.read_csv(file_path, encoding='ISO-8859-1')
+    data = pd.read_json(file_path, encoding='ISO-8859-1')
     data_dict = data.to_dict('records')
     
     for record in data_dict:

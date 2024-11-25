@@ -61,19 +61,24 @@ def generate_example_queries(user_input, db, collection_name):
         "count": "count number of <B>",
         "where": "find <A> where <B> equals value",
         "order by": "find <A> and order by <B>",
-        "join": "join <A> with <B>"
+        "join": "join <A> with <B>",
+        "min": "find the minimum <A> grouped by <B>",
+        "max": "find the maximum <A> grouped by <B>"
     }
 
     # Retrieve collection attributes to dynamically generate queries
     attributes = get_collection_attributes(db, collection_name)
+    attribute_types = get_attribute_types(db, collection_name)
     if not attributes:
         return "No attributes found in the collection for query generation.", {}
 
     # Check if specific keywords are present in user_input
     for keyword, template in keyword_templates.items():
         if keyword in user_input.lower():
-            selected_attribute_1 = random.choice(attributes)
-            selected_attribute_2 = random.choice([attr for attr in attributes if attr != selected_attribute_1])
+            # selected_attribute_1 = random.choice(attributes)
+            # selected_attribute_2 = random.choice([attr for attr in attributes if attr != selected_attribute_1])
+            selected_attribute_1 = random.choice([attr for attr in attributes if attribute_types.get(attr) in ["int", "float"]])
+            selected_attribute_2 = random.choice([attr for attr in attributes if attribute_types.get(attr) not in ("int", "float") and attr != selected_attribute_1])
             natural_language_query = template.replace("<A>", selected_attribute_1).replace("<B>", selected_attribute_2)
 
             return natural_language_query
@@ -86,86 +91,6 @@ def generate_example_queries(user_input, db, collection_name):
     natural_language_query = selected_template.replace("<A>", selected_attribute_1).replace("<B>", selected_attribute_2)
 
     return natural_language_query
-
-def generate_query(db_name, collection_name, natural_language_query, selected_attribute_1, selected_attribute_2):
-    # Generate the corresponding complete MongoDB query
-    if "total" in natural_language_query or "sum" in natural_language_query:
-        mongo_pipeline = [
-            {"$group": {"_id": f"${selected_attribute_2}", "total": {"$sum": f"${selected_attribute_1}"}}}
-        ]
-        query = f"db.{db_name}.{collection_name}.aggregate({mongo_pipeline})"
-    elif "average" in natural_language_query:
-        mongo_pipeline = [
-            {"$group": {"_id": f"${selected_attribute_2}", "average": {"$avg": f"${selected_attribute_1}"}}}
-        ]
-        query = f"db.{db_name}.{collection_name}.aggregate({mongo_pipeline})"
-    elif "count" in natural_language_query:
-        mongo_pipeline = [
-            {"$group": {"_id": f"${selected_attribute_2}", "count": {"$sum": 1}}}
-        ]
-        query = f"db.{db_name}.{collection_name}.aggregate({mongo_pipeline})"
-    elif "group by" in natural_language_query:
-        mongo_pipeline = [
-            {"$group": {"_id": f"${selected_attribute_2}", "grouped_average": {"$avg": f"${selected_attribute_1}"}}}
-        ]
-        query = f"db.{db_name}.{collection_name}.aggregate({mongo_pipeline})"
-    elif "where" in natural_language_query:
-        value = "some_value"  # Replace with actual value or prompt the user for input
-        find_filter = {selected_attribute_2: value}
-        query = f"db.{db_name}.{collection_name}.find({find_filter})"
-    elif "order by" in natural_language_query:
-        sort_order = 1 if "asc" in natural_language_query.lower() else -1
-        find_filter = {}
-        sort = [(selected_attribute_2, sort_order)]
-        query = f"db.{db_name}.{collection_name}.find({find_filter}).sort({sort})"
-    elif "join" in natural_language_query:
-        query = f"db.{db_name}.{collection_name}.aggregate([{{'$lookup': 'details of join'}}])"
-    elif "find" in natural_language_query:
-        find_filter = {selected_attribute_2: {"$exists": True}}
-        query = f"db.{db_name}.{collection_name}.find({find_filter})"
-    else:
-        query = f"db.{db_name}.{collection_name}.find({{}})"
-
-    return query
-
-def execute_query_from_input(user_input, db, collection_name):
-    # Extract collection attributes
-    attributes = get_collection_attributes(db, collection_name)
-    if not attributes:
-        return "No attributes found in the collection for executing the query."
-
-    keyword = None
-    for key in ["sum", "total", "average", "count", "group by", "where", "order by", "find"]:
-        if key in user_input.lower():
-            keyword = key
-            break
-
-    selected_attribute_1 = None
-    selected_attribute_2 = None
-    for attr in attributes:
-        if re.search(rf"\b{attr}\b", user_input, re.IGNORECASE):
-            if not selected_attribute_1:
-                selected_attribute_1 = attr
-            elif not selected_attribute_2:
-                selected_attribute_2 = attr
-                break
-
-    if not selected_attribute_1:
-        selected_attribute_1 = random.choice(attributes)
-    if not selected_attribute_2:
-        selected_attribute_2 = random.choice([attr for attr in attributes if attr != selected_attribute_1])
-
-    mongo_query = generate_query(db.name, collection_name, keyword, selected_attribute_1, selected_attribute_2)
-    
-    collection = db[collection_name]
-    result = None
-    try:
-        exec_query = eval(mongo_query)
-        result = list(exec_query)
-    except Exception as e:
-        result = str(e)
-
-    return result
 
 def execute_query(collection, mongo_query):
     # Execute the provided MongoDB query and return the result
@@ -185,7 +110,7 @@ def execute_query(collection, mongo_query):
 
 def get_execute_query(db, collection_name, random_query):
     if random_query:
-        print("\n\033[92mTry ask me for example queries (i.e. example mongo queries, average, group by, sum, total)\033[0m")
+        print("\n\033[92mTry ask me for example queries (i.e. example mongo queries, average, group by, sum, total, min, max, where, order, count)\033[0m")
         user_input = input("prompt:\t")
 
         natural_language_query = generate_example_queries(user_input, db, collection_name)
