@@ -37,7 +37,7 @@ def sql():
         print("4. Answer Natural Language Questions\n")
         print("5. Exit")
 
-        choice = input("Enter your choice (1/2/3): ").strip()
+        choice = input("Enter your choice (1/2/3/4/5): ").strip()
 
         if choice.strip() == '1':
             file_path = input("Please enter the path to the CSV file you want to upload: ")
