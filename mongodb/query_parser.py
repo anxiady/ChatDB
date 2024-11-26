@@ -59,11 +59,11 @@ def generate_example_queries(user_input, db, collection_name):
         "sum": "sum of <A> per <B>",
         "average": "average <A> by <B>",
         "count": "count number of <B>",
-        "where": "find <A> where <B> equals value",
+        "where": "find <A> where <B> <Operator> <C>",
         "order by": "find <A> and order by <B>",
         "join": "join <A> with <B>",
-        "min": "find the minimum <A> grouped by <B>",
-        "max": "find the maximum <A> grouped by <B>"
+        "min": "find the min <A> grouped by <B>",
+        "max": "find the max <A> grouped by <B>"
     }
 
     # Retrieve collection attributes to dynamically generate queries
@@ -72,9 +72,18 @@ def generate_example_queries(user_input, db, collection_name):
     if not attributes:
         return "No attributes found in the collection for query generation.", {}
 
+    conditions = ['<=', '>=', '>', '<', '=']
     # Check if specific keywords are present in user_input
     for keyword, template in keyword_templates.items():
-        if keyword in user_input.lower():
+        if keyword in user_input.lower() and keyword == 'where':
+            selected_attribute_1 = random.choice([attr for attr in attributes if attribute_types.get(attr) in ["int", "float"]])
+            selected_attribute_2 = random.choice([attr for attr in attributes if attribute_types.get(attr) not in ("int", "float") and attr != selected_attribute_1])
+            operator = random.choice(conditions)
+            random_value = random.randint(1, 100)
+            natural_language_query = template.replace("<A>", selected_attribute_1).replace("<B>", selected_attribute_2).replace("<Operator>", operator).replace("<C>", f"{random_value}")
+            
+            return natural_language_query
+        elif keyword in user_input.lower():
             # selected_attribute_1 = random.choice(attributes)
             # selected_attribute_2 = random.choice([attr for attr in attributes if attr != selected_attribute_1])
             selected_attribute_1 = random.choice([attr for attr in attributes if attribute_types.get(attr) in ["int", "float"]])
@@ -86,9 +95,18 @@ def generate_example_queries(user_input, db, collection_name):
     # If no keyword is found, select a random query template
     templates = list(keyword_templates.values())
     selected_template = random.choice(templates)
-    selected_attribute_1 = random.choice(attributes)
-    selected_attribute_2 = random.choice([attr for attr in attributes if attr != selected_attribute_1])
-    natural_language_query = selected_template.replace("<A>", selected_attribute_1).replace("<B>", selected_attribute_2)
+    if selected_template == "find <A> where <B> <Operator> <C>":
+        selected_attribute_1 = random.choice([attr for attr in attributes if attribute_types.get(attr) in ["int", "float"]])
+        selected_attribute_2 = random.choice([attr for attr in attributes if attribute_types.get(attr) not in ("int", "float") and attr != selected_attribute_1])
+        natural_language_query = template.replace("<A>", selected_attribute_1).replace("<B>", selected_attribute_2).replace("<Operator>", operator).replace("<C>", f"{random_value}")
+    else:
+        selected_attribute_1 = random.choice([attr for attr in attributes if attribute_types.get(attr) in ["int", "float"]])
+        selected_attribute_2 = random.choice([attr for attr in attributes if attribute_types.get(attr) not in ("int", "float") and attr != selected_attribute_1])
+        natural_language_query = template.replace("<A>", selected_attribute_1).replace("<B>", selected_attribute_2)
+
+    # selected_attribute_1 = random.choice(attributes)
+    # selected_attribute_2 = random.choice([attr for attr in attributes if attr != selected_attribute_1])
+    # natural_language_query = selected_template.replace("<A>", selected_attribute_1).replace("<B>", selected_attribute_2)
 
     return natural_language_query
 
@@ -110,23 +128,33 @@ def execute_query(collection, mongo_query):
 
 def get_execute_query(db, collection_name, random_query):
     if random_query:
-        print("\n\033[92mTry ask me for example queries (i.e. example mongo queries, average, group by, sum, total, min, max, where, order, count)\033[0m")
+        print("\n\033[92mTry ask me for example queries (i.e. example mongo queries, average, group, sum, total, min, max, where, order, count, join, find)\033[0m")
         user_input = input("prompt:\t")
-
-        natural_language_query = generate_example_queries(user_input, db, collection_name)
-        print(f"natural language: {natural_language_query}")
-        mongo_query = preprocess(natural_language_query, db, collection_name)
-        # Display the generated example query
-        print(f"\n\033[92mExample Query:\033[0m {natural_language_query}")
-        print(f"\033[92mMongoDB Query:\033[0m {mongo_query}")
-        # print(mongo_query)
+        queries = []
+        for iter in range(1,4):
+            natural_language_query = generate_example_queries(user_input, db, collection_name)
+            
+            mongo_query = preprocess(natural_language_query, db, collection_name)
+            print(f"\t{iter}.")
+            print(f"\t\033[92mExample Query:\033[0m {natural_language_query}")
+            print(f"\t\033[92mMongoDB Query:\033[0m {mongo_query}")
+            queries.append(mongo_query)
 
         # Execute the query if user wants me to
-        execution = input("\n\033[92mDo you want me to execute the query for you? (y/n)\033[0m")
-        if execution.lower().strip() == 'y':
-            mongo_pipeline = mongo_query
+        # execution = input("\n\033[92mDo you want me to execute the query for you? (y/n)\033[0m")
+        execution = input("\n\033[92mWhich query do you want to execute? (1/2/3) or type any other key to return: \033[0m").strip()
+        if execution == '1':
+            mongo_pipeline = queries[0]
+        elif execution == '2':
+            mongo_pipeline = queries[1]
+        elif execution == '3':
+            mongo_pipeline = queries[2]
         else:
             return
+        # if execution.lower().strip() == 'y':
+        #     mongo_pipeline = mongo_query
+        # else:
+        #     return
 
     else:
         user_input = input("Enter your query: ")
@@ -137,7 +165,7 @@ def get_execute_query(db, collection_name, random_query):
         # query_string = convert_pipeline_to_string(db.name, collection_name, mongo_pipeline)
         # print(f"Generated Query: {query_string}")
 
-        print(f"Generated Query: {mongo_pipeline}")
+        print(f"Generated Query: db.{collection_name}.aggregate({mongo_pipeline})")
     
     # Execute the generated MongoDB query
     collection = db[collection_name]
@@ -178,7 +206,7 @@ def display_result(query_result):
         print(f"Error: {query_result}")
     else:
         for i, document in enumerate(query_result, start=1):
-            if i == 10:
+            if i == 11:
                 break
             print(f"Result {i}:")
             for key, value in document.items():
@@ -231,7 +259,8 @@ def preprocess(user_input, db, collection_name):
 
     # Set default attributes if none are identified
     if not selected_attributes:
-        selected_attributes = [random.choice(attributes)]
+        # selected_attributes = [random.choice(attributes)]
+        raise ValueError("Please enter a column to explore")
 
     # Separate the attributes into numeric and string attributes
     numeric_attributes = [attr for attr in selected_attributes if attribute_types.get(attr) in ("int", "float")]
@@ -306,23 +335,24 @@ def preprocess(user_input, db, collection_name):
                 else:
                     raise ValueError("A valid string attribute is required to count occurrences.")
 
-        elif keyword == "group":
-            # Handle group by
-            group_field = next((word for word in tokens if word in selected_attributes), None)
+        # elif keyword == "group":
+        #     # Handle group by
+        #     group_field = next((word for word in tokens if word in selected_attributes), None)
+        #     print(f"Selected_field: {selected_attributes}")
+        #     if not group_field:
+        #         raise ValueError("No valid field found to group by.")
 
-            if not group_field:
-                raise ValueError("No valid field found to group by.")
-
-            group_stage = {
-                "$group": {
-                    "_id": f"${group_field}"
-                }
-            }
-            mongo_pipeline.append(group_stage)
+        #     group_stage = {
+        #         "$group": {
+        #             "_id": f"${group_field}"
+        #         }
+        #     }
+        #     mongo_pipeline.append(group_stage)
 
         elif keyword == "where":
             # Handle where conditions
-            tokens = word_tokenize(user_input)
+            # tokens = word_tokenize(user_input)
+            tokens = user_input.lower().split()
             conditions = {}
             # where_col = next((col for col in selected_attributes if col in tokens), None)
             if "where" in tokens:
@@ -335,7 +365,7 @@ def preprocess(user_input, db, collection_name):
                     raise ValueError("No attribute specified after 'where'.")
             else:
                 where_col = None
-            print(f"where_col: {where_col}")
+            # print(f"where_col: {where_col}")
             if where_col:
                 # Map Python-style operators to MongoDB operators
                 operator_map = {
@@ -347,12 +377,17 @@ def preprocess(user_input, db, collection_name):
                 }
 
                 # Find the operator in the tokens
-                condition_operator = next((op for op in operator_map.keys() if op in tokens), None)
-
+                # condition_operator = next((op for op in operator_map.keys() if op in tokens), None)
+                condition_operator = next((op for op in operator_map.keys() if any(token == op for token in tokens)), None)
+                # print(condition_operator)
+                # print(tokens)
+                # print(user_input)
                 if condition_operator:
                     # Find the value directly following the operator
                     tokens = user_input.split()
+                    # print(f"tokens: {tokens}")
                     operator_index = tokens.index(condition_operator)
+                    # print("here2")
                     if operator_index + 1 < len(tokens):  # Ensure there's a token after the operator
                         condition_value = tokens[operator_index + 1]
 
@@ -402,27 +437,18 @@ def preprocess(user_input, db, collection_name):
                 else:
                     order_index = words.index("sort")
                 if order_index + 1 < len(words):  # Ensure there's a word after "order"
-                    print(f"potential sort: {potential_sort_field}")
-                    print(f"sort: {sort_field}")
+                    # print(f"potential sort: {potential_sort_field}")
+                    # print(f"sort: {sort_field}")
                     potential_project_field = words[order_index + 1]
                     # print(f"attributes: {attributes}")
                     if potential_project_field in attributes:  # Validate it's an attribute
                         project_field = potential_project_field
-                        # if "find" in keywords:
-                        #     project_stage = {
-                        #         "$project": {attr: 1 for attr in selected_attributes}
-                        #     }
-                        #     mongo_pipeline.append(project_stage)
                         mongo_pipeline.append({
                             "$project": {project_field: 1,
                                         sort_field: 1}
                         })
                     elif potential_project_field == 'by':
                         sort_field = potential_sort_field
-                        # sort_field = string_attribute or numeric_attribute
-                        # mongo_pipeline.append({
-                        #     "$project": {sort_field: 1}
-                        # })
                         
                     else:
                         raise ValueError(f"Field '{potential_project_field}' after 'order' is not a valid attribute.")
@@ -443,7 +469,7 @@ def preprocess(user_input, db, collection_name):
                 }
                 mongo_pipeline.append(project_stage)
             # print(f"potential sort: {potential_sort_field}")
-            print(f"sort: {sort_field}")
+            # print(f"sort: {sort_field}")
 
             
         elif keyword == "join":
@@ -525,21 +551,21 @@ def preprocess(user_input, db, collection_name):
 
         # elif keyword == "join":
         #     raise ValueError("'join' is not incorporated in this program. Try a different query.")
-        elif keyword == "find" and "where" not in keywords and "order" not in keywords and "sort" not in keywords:
+        elif keyword == "find" and len(keywords)==1:
             # Handle find
             conditions = {attr: {"$exists": True} for attr in selected_attributes}
             mongo_pipeline.append({"$match": conditions})
             project_stage = {
                 "$project": {attr: 1 for attr in selected_attributes}
             }
-            print(f"conditions: {conditions}")
-            print(f"project_Stage: {project_stage}")
+            # print(f"conditions: {conditions}")
+            # print(f"project_Stage: {project_stage}")
             mongo_pipeline.append(project_stage)
 
     if not mongo_pipeline:
         mongo_pipeline = [{"$match": {}}]
 
-    print(f"selected_attributes: {selected_attributes}")
-    print(f"mongo_pipeline: {mongo_pipeline}")
+    # print(f"selected_attributes: {selected_attributes}")
+    # print(f"mongo_pipeline: {mongo_pipeline}")
 
     return mongo_pipeline

@@ -80,9 +80,10 @@ def mongo():
                                     print("1. Sample Queries")
                                     print("2. Your own Queries")
                                     print("3. View attributes for all collections")
-                                    print("4. Back<")
+                                    print("4. User Guideline")
+                                    print("5. Back<")
                                     print(f"\nCurrent Collection: \033[91m{chosen_collection}\033[0m")
-                                    option = input("Enter your choice (1/2/3/4): ")
+                                    option = input("Enter your choice (1/2/3/4/5): ")
                                     if option == "1":
                                         get_execute_query(db,chosen_collection, random_query=True)
                                     elif option == "2":
@@ -91,6 +92,20 @@ def mongo():
                                     elif option == "3":
                                         display_all_columns(db)
                                     elif option == "4":
+                                        print("\n\tmin:       find the min <A> from <B>")
+                                        print("\tmax:       find the max <A> grouped by <B>")
+                                        print("\tgroup by:  group by <B> and calculate average of <A>")
+                                        print("\ttotal:     total <A> by <B>")
+                                        print("\tfind:      find <A> ")
+                                        print("\tsum:       sum of <A> per <B>")
+                                        print("\taverage:   average <A> by <B>")
+                                        print("\tcount:     count number of <B>")
+                                        print("\tcount:     count the number of different <B>")
+                                        print("\twhere:     find <A> where <B> '=,>,<...' <value>")
+                                        print("\torder by:  find <A> and order by <B> desc/asc")
+                                        print("\tjoin:      join <collection> on <A> and <B>")
+
+                                    elif option == "5":
                                         return_to_main_menu = True
                                         break
                                 except Exception as e:
