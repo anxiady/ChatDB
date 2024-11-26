@@ -73,7 +73,7 @@ def sql():
             else:
                 print("No tables found in the database.")
         elif choice.strip() == '3':
-            gen_sample_queries(connection, num_queries = 3, random_queries = True)
+            gen_sample_queries(connection, num_queries = 1, random_queries = True)
 
         elif choice.strip() == '4':
             gen_sample_queries(connection,num_queries = 1, random_queries = False)

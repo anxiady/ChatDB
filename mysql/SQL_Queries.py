@@ -12,6 +12,7 @@ from nltk.corpus import wordnet
 from nltk.stem import WordNetLemmatizer
 from nltk import pos_tag
 import re
+from prettytable import PrettyTable
 
 nltk.download('punkt')
 nltk.download('punkt_tab')
@@ -93,7 +94,7 @@ def column_types(cursor, table):
     columns_type = cursor.fetchall()
     columns = [col[0].strip() for col in columns_type]
     numeric_columns = [col[0].strip() for col in columns_type if col[1].strip() in ['int', 'float', 'double', 'decimal', 'smallint', 'tinyint', 'bigint']]
-    categorical_columns = [col[0].strip() for col in columns_type if col[1].strip() in ['varchar', 'char', 'text', 'enum', 'nchar', 'nvarchar', 'ntext']]
+    categorical_columns = [col[0].strip() for col in columns_type if col[1].strip() in ['varchar(25)', 'char', 'text', 'enum', 'nchar', 'nvarchar', 'ntext']]
 
     return columns, numeric_columns, categorical_columns
 
@@ -244,11 +245,19 @@ def execute_query(cursor, query, query_number):
                 result = cursor.fetchall()
                 if result:
                     columns = [desc[0] for desc in cursor.description]
-                    print("\nQuery Result: ")
-                    print(f"{' | '.join(columns)}")
-                    print('-'*30)
+                    table = PrettyTable()
+                    table.field_names = columns
+
                     for row in result:
-                        print(f"{' | '.join(map(str, row))}")
+                        table.add_row(row)
+
+                    print("\nQuery Result:")
+                    print(table)
+                    # print("\nQuery Result: ")
+                    # print(f"{' | '.join(columns)}")
+                    # print('-'*30)
+                    # for row in result:
+                    #     print(f"{' | '.join(map(str, row))}")
                             
                 else:
                     print("No Results Given")
@@ -573,6 +582,10 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                 where_index = filtered_tokens.index('where')
                 where_tokens = filtered_tokens[where_index + 1:]
                 columns_used = ', '.join(set(col for col in filtered_tokens if col in numeric_columns + categorical_columns))
+                # print(f"categorical_columns: {categorical_columns}")
+                # print(f"filtered_tokens: {filtered_tokens}")
+                # print(f"columns_used: {columns_used}")
+
                 where_col, where_condition, where_value = get_where_clause(cursor, table_choice, numeric_columns, categorical_columns, columns, random_queries, conditions, where_tokens)
                     
                 print(f"Condition: {where_condition}, Value: {where_value}, agg_col: {where_col}, columns_used: {columns_used}")
