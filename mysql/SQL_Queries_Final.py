@@ -12,7 +12,6 @@ from nltk.corpus import wordnet
 from nltk.stem import WordNetLemmatizer
 from nltk import pos_tag
 import re
-from prettytable import PrettyTable
 
 nltk.download('punkt')
 nltk.download('punkt_tab')
@@ -94,7 +93,7 @@ def column_types(cursor, table):
     columns_type = cursor.fetchall()
     columns = [col[0].strip() for col in columns_type]
     numeric_columns = [col[0].strip() for col in columns_type if col[1].strip() in ['int', 'float', 'double', 'decimal', 'smallint', 'tinyint', 'bigint']]
-    categorical_columns = [col[0].strip() for col in columns_type if col[1].strip() in ['varchar(25)', 'char', 'text', 'enum', 'nchar', 'nvarchar', 'ntext']]
+    categorical_columns = [col[0].strip() for col in columns_type if col[1].strip() in ['varchar', 'char', 'text', 'enum', 'nchar', 'nvarchar', 'ntext']]
 
     return columns, numeric_columns, categorical_columns
 
@@ -245,19 +244,11 @@ def execute_query(cursor, query, query_number):
                 result = cursor.fetchall()
                 if result:
                     columns = [desc[0] for desc in cursor.description]
-                    table = PrettyTable()
-                    table.field_names = columns
-
+                    print("\nQuery Result: ")
+                    print(f"{' | '.join(columns)}")
+                    print('-'*30)
                     for row in result:
-                        table.add_row(row)
-
-                    print("\nQuery Result:")
-                    print(table)
-                    # print("\nQuery Result: ")
-                    # print(f"{' | '.join(columns)}")
-                    # print('-'*30)
-                    # for row in result:
-                    #     print(f"{' | '.join(map(str, row))}")
+                        print(f"{' | '.join(map(str, row))}")
                             
                 else:
                     print("No Results Given")
@@ -301,7 +292,7 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                       f"‘where … order by …. limit’. When asking for sample queries and writing "
                       f"your own in natural language, please try to include one of those "
                       f"keywords so our NLP can process your question.")
-        user_input = input("\nWhat kind of query would you like to see or would you like ChatDB to generate one? (Type 'Exit' to leave.) ").strip()
+        user_input = input("\nWhat kind of query would you like to see or would you like ChatDB to generate one (Type 'Exit' to leave.)? ").strip()
         print(f"")
 
     else:
@@ -311,7 +302,7 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                       f"‘where … order by …. limit’. When asking for sample queries and writing "
                       f"your own in natural language, please try to include one of those "
                       f"keywords so our NLP can process your question. Table columns are CASE SENSITIVE.")
-        user_input = input("\nAsk a question: (Type 'Exit' to leave.) ").strip()
+        user_input = input("\nAsk a question (Type 'Exit' to leave.):  ").strip()
 
     if user_input.lower() == 'exit':
         return[]
@@ -325,7 +316,9 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
             table_choice, columns, numeric_columns, categorical_columns = get_table(user_input, cursor)
             if table_choice is None:
                 print("Unable to find table based on user input")
-                user_input = input("Rewrite your question: ")
+                user_input = input("Rewrite your question (or type 'Exit' to leave): ")
+                if user_input.lower() == 'exit':
+                    return[]
                 continue
 
     
@@ -357,9 +350,15 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
 
         if 'any' in filtered_tokens or not any(query in filtered_tokens for query in queries):
             print("Generating any query. You selected 'any' or had no specific query identified.")
-            selected_queries = random.sample(queries, k = num_queries)
+            selected_queries = random.sample(queries, k = min(num_queries, len(queries)))
+            specific_query = [query for query in selected_queries]
+            #print(selected_queries)
+            
         else:
             selected_queries = random.choices(specific_query, k = num_queries)
+            #print(selected_queries)
+
+
          
 
     else:
@@ -371,13 +370,17 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
         else:
             while not specific_query:
                 print("Unable to idenfiy query based on user input\n")
-                user_input = input("Rewrite your question: ")
+                user_input = input("Rewrite your question (or enter 'Exit' to leave): ")
+                if user_input.lower() == 'exit':
+                    return[]
+                
                 filtered_tokens = preprocess(user_input)
                 specific_query = [query for query in queries if query in filtered_tokens]
             selected_queries = specific_query[:num_queries]
 
 
     for query_i in selected_queries:
+        print(query_i)
 
         nl, query = None, None
 
@@ -582,10 +585,6 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                 where_index = filtered_tokens.index('where')
                 where_tokens = filtered_tokens[where_index + 1:]
                 columns_used = ', '.join(set(col for col in filtered_tokens if col in numeric_columns + categorical_columns))
-                # print(f"categorical_columns: {categorical_columns}")
-                # print(f"filtered_tokens: {filtered_tokens}")
-                # print(f"columns_used: {columns_used}")
-
                 where_col, where_condition, where_value = get_where_clause(cursor, table_choice, numeric_columns, categorical_columns, columns, random_queries, conditions, where_tokens)
                     
                 print(f"Condition: {where_condition}, Value: {where_value}, agg_col: {where_col}, columns_used: {columns_used}")
