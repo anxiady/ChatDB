@@ -60,6 +60,7 @@ def preprocess(user_input):
     tokens = re.findall(r'<=|>=|=|<|>|\w+[\w_/.\-]*', user_input)
   
     filtered_tokens = [token.lower() if token.lower() in queries else token for token in tokens]
+    #print(filtered_tokens)
     return filtered_tokens
 
 def preprocess_keywords(tokens, mapping):
@@ -324,7 +325,7 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
 
         
     queries = ['having', 'order', 'group', 'max', 'min', 'sum', 'avg', 'count', 'where', 'select']
-    conditions = ['>', '<', '=', '<=', '>=']
+    conditions = ['<=', '>=', '>', '<', '=']
     condition_text = {'>': 'greater than', '<': 'less than', '=': 'equal to', '<=': 'less than or equal to', '>=': 'greater than or equal to'}
     agg_functions = ['avg', 'sum', 'max', 'min', 'count']
     agg_text = {'avg': 'average', 'sum': 'sum', 'max': 'maximum', 'min': 'minimum', 'count': 'count'}
@@ -333,7 +334,6 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                        'equal to': '=', 'is': '=', 'are': '=', 'average': 'avg', 'maximum': 'max', 'minimum': 'min', 'total': 'sum',
                       'find': 'select', 'show': 'select', 'grouped': 'group'}
     
-   
 
     filtered_tokens = preprocess(user_input)
     filtered_tokens = preprocess_keywords(filtered_tokens, keyword_mapping)
@@ -411,7 +411,7 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                     agg_function, having_col, having_condition, having_value = get_having_clause(cursor, table_choice, numeric_columns, categorical_columns, columns, random_queries, conditions, agg_functions, having_tokens)
                     group_col = next((col for col in categorical_columns if col in group_tokens))
                 
-                print(f"where_col: {where_col} where_condition: {where_condition} where_value: {where_value} group_col: {group_col} having_col: {having_col} agg_function: {agg_function} having_condition: {having_condition} having_values: {having_value}")
+                #print(f"where_col: {where_col} where_condition: {where_condition} where_value: {where_value} group_col: {group_col} having_col: {having_col} agg_function: {agg_function} having_condition: {having_condition} having_values: {having_value}")
 
             if (where_col is not None and where_condition is not None and where_value is not None and group_col is not None and having_col is not None and agg_function is not None and having_condition is not None and having_value is not None):
 
