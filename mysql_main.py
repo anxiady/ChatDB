@@ -1,4 +1,3 @@
-from mysql.Sample_Data import sql_sample_data
 from mysql.Upload_SQL import upload, upload_data_to_table, display_all_columns, display_columns, display_sample_rows
 from mysql.SQL_Queries import connect_to_SQL
 from mysql.SQL_Queries import gen_sample_queries
