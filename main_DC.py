@@ -6,7 +6,7 @@ from SQL.SQL_Queries import gen_sample_queries
 
 if __name__ == "__main__":
 
-    print("Welcome to ChatDB\n")
+    print("Welcome to MongoDB database\n")
     selected_db = None
     connection = None
     while True:
