@@ -128,7 +128,7 @@ def execute_query(collection, mongo_query):
 
 def get_execute_query(db, collection_name, random_query):
     if random_query:
-        print("\n\033[92mTry ask me for example queries (i.e. example mongo queries, average, group, sum, total, min, max, where, order, count, join, find)\033[0m")
+        print("\n\033[92mTry ask me for example queries (i.e. example mongo queries, average, group, sum, total, min, max, where, order, count, find)\033[0m")
         user_input = input("prompt:\t")
         queries = []
         for iter in range(1,4):

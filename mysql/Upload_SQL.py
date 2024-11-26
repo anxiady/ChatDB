@@ -168,7 +168,7 @@ def upload_data_to_table(connection, db_name, table_name, file_path):
 
     # Create the table dynamically based on the data schema
     columns = data.columns
-    column_definitions = ", ".join([f"`{col}` TEXT" for col in columns])  # Define all columns as TEXT for simplicity
+    column_definitions = ", ".join([f"`{col}` {infer_sql_type(data[col])}" for col in columns])
     cursor.execute(f"CREATE TABLE `{table_name}` ({column_definitions})")
     print(f"Table '{table_name}' created with columns: {', '.join(columns)}")
 

@@ -1,6 +1,6 @@
 from mysql.Upload_SQL import upload, upload_data_to_table, display_all_columns, display_columns, display_sample_rows
-from mysql.SQL_Queries import connect_to_SQL
-from mysql.SQL_Queries import gen_sample_queries
+from mysql.SQL_Queries_andy import connect_to_SQL
+from mysql.SQL_Queries_andy import gen_sample_queries
 import pymysql
 import pandas as pd
 
@@ -73,7 +73,7 @@ def sql():
             else:
                 print("No tables found in the database.")
         elif choice.strip() == '3':
-            gen_sample_queries(connection, num_queries = 1, random_queries = True)
+            gen_sample_queries(connection, num_queries = 3, random_queries = True)
 
         elif choice.strip() == '4':
             gen_sample_queries(connection,num_queries = 1, random_queries = False)

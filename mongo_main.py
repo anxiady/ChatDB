@@ -92,18 +92,18 @@ def mongo():
                                     elif option == "3":
                                         display_all_columns(db)
                                     elif option == "4":
-                                        print("\n\tmin:       find the min <A> from <B>")
-                                        print("\tmax:       find the max <A> grouped by <B>")
-                                        print("\tgroup by:  group by <B> and calculate average of <A>")
-                                        print("\ttotal:     total <A> by <B>")
-                                        print("\tfind:      find <A> ")
-                                        print("\tsum:       sum of <A> per <B>")
-                                        print("\taverage:   average <A> by <B>")
-                                        print("\tcount:     count number of <B>")
-                                        print("\tcount:     count the number of different <B>")
-                                        print("\twhere:     find <A> where <B> '=,>,<...' <value>")
-                                        print("\torder by:  find <A> and order by <B> desc/asc")
-                                        print("\tjoin:      join <collection> on <A> and <B>")
+                                        print("\n\t\033[92mmin:\033[0m       find the min <A> from <B>")
+                                        print("\t\033[92mmax:\033[0m       find the max <A> grouped by <B>")
+                                        print("\t\033[92mgroup by:\033[0m  group by <B> and calculate average of <A>")
+                                        print("\t\033[92mtotal:\033[0m     total <A> by <B>")
+                                        print("\t\033[92mfind:\033[0m      find <A> ")
+                                        print("\t\033[92msum:\033[0m       sum of <A> per <B>")
+                                        print("\t\033[92maverage:\033[0m   average <A> by <B>")
+                                        print("\t\033[92mcount:\033[0m     count number of <B>")
+                                        print("\t\033[92mcount:\033[0m     count the number of different <B>")
+                                        print("\t\033[92mwhere:\033[0m     find <A> where <B> '=,>,<...' <value>")
+                                        print("\t\033[92morder by:\033[0m  find <A> and order by <B> desc/asc")
+                                        print("\t\033[92mjoin:\033[0m      join <collection> on <A> and <B>")
 
                                     elif option == "5":
                                         return_to_main_menu = True

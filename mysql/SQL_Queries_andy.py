@@ -12,6 +12,7 @@ from nltk.corpus import wordnet
 from nltk.stem import WordNetLemmatizer
 from nltk import pos_tag
 import re
+from prettytable import PrettyTable
 
 nltk.download('punkt')
 nltk.download('punkt_tab')
@@ -93,7 +94,7 @@ def column_types(cursor, table):
     columns_type = cursor.fetchall()
     columns = [col[0].strip() for col in columns_type]
     numeric_columns = [col[0].strip() for col in columns_type if col[1].strip() in ['int', 'float', 'double', 'decimal', 'smallint', 'tinyint', 'bigint']]
-    categorical_columns = [col[0].strip() for col in columns_type if col[1].strip() in ['varchar', 'char', 'text', 'enum', 'nchar', 'nvarchar', 'ntext']]
+    categorical_columns = [col[0].strip() for col in columns_type if col[1].strip() in ['varchar(25)', 'char', 'text', 'enum', 'nchar', 'nvarchar', 'ntext']]
 
     return columns, numeric_columns, categorical_columns
 
@@ -235,6 +236,35 @@ def get_order_clause(cursor, table_choice, categorical_columns, numeric_columns,
 
     return order_col, order_type, limit_value
 
+# def execute_query(cursor, query, query_number):
+#     while True:
+#         execute_query = input(f"Do you want to execute the query? (yes/no) ").strip().lower()
+#         if execute_query == 'yes':
+#             try:
+#                 cursor.execute(query)
+#                 result = cursor.fetchall()
+#                 if result:
+#                     columns = [desc[0] for desc in cursor.description]
+#                     print("\nQuery Result: ")
+#                     print(f"{' | '.join(columns)}")
+#                     print('-'*30)
+#                     for row in result:
+#                         print(f"{' | '.join(map(str, row))}")
+                            
+#                 else:
+#                     print("No Results Given")
+                    
+
+#             except Exception as e:
+#                 print(f"Error executing query: {e}")
+                
+#             break
+            
+#         elif execute_query == 'no':
+#             break
+#         else:
+#             print("Could not recognize input. Please type 'yes' or 'no'.")
+
 def execute_query(cursor, query, query_number):
     while True:
         execute_query = input(f"Do you want to execute the query? (yes/no) ").strip().lower()
@@ -244,21 +274,19 @@ def execute_query(cursor, query, query_number):
                 result = cursor.fetchall()
                 if result:
                     columns = [desc[0] for desc in cursor.description]
-                    print("\nQuery Result: ")
-                    print(f"{' | '.join(columns)}")
-                    print('-'*30)
-                    for row in result:
-                        print(f"{' | '.join(map(str, row))}")
-                            
-                else:
-                    print("No Results Given")
                     
-
+                    table = PrettyTable()
+                    table.field_names = columns
+                    for row in result:
+                        table.add_row(row)
+                    
+                    print("\nQuery Result:")
+                    print(table)
+                else:
+                    print("No results returned.")
             except Exception as e:
                 print(f"Error executing query: {e}")
-                
             break
-            
         elif execute_query == 'no':
             break
         else:
@@ -380,7 +408,7 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
 
 
     for query_i in selected_queries:
-        print(query_i)
+        # print(query_i)
 
         nl, query = None, None
 

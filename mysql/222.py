@@ -12,6 +12,7 @@ from nltk.corpus import wordnet
 from nltk.stem import WordNetLemmatizer
 from nltk import pos_tag
 import re
+from prettytable import PrettyTable
 
 nltk.download('punkt')
 nltk.download('punkt_tab')
