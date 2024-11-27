@@ -294,7 +294,7 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
         print(f"Note: Available queries are ‘select’ , ‘where’, ‘group by’ with aggregate "
                       f"function (‘MAX’, ‘MIN’, ‘SUM’, ’COUNT’, ‘AVG’) , aggregate functions "
                       f"alone, ‘having’, ‘order by …. limit’, ‘where … group by … having’, and "
-                      f"‘where … order by …. limit’. When asking for sample queries and writing "
+                      f"‘where … order by …. limit’. \nWhen asking for sample queries and writing "
                       f"your own in natural language, please try to include one of those "
                       f"keywords so our NLP can process your question.")
         user_input = input("\nWhat kind of query would you like to see or would you like ChatDB to generate one (Type 'Exit' to leave.)? ").strip()
@@ -303,8 +303,8 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
     else:
         print(f"Note: Available query NLP are ‘select ... table_name’ , ‘where’, ‘group by’ with aggregate "
                       f"function (‘MAX’, ‘MIN’, ‘SUM’, ’COUNT’, ‘AVG’) , aggregate functions "
-                      f"alone, ‘group by... having... aggregate function(column)’, ‘order by …. limit’, ‘where … group by … having... aggregate_function(column)’, and "
-                      f"‘where … order by …. limit’. When asking for sample queries and writing "
+                      f"alone, ‘group by... having... aggregate function(column)’, ‘order by …. limit’, ‘where … group by … having... aggregate_function(column)’, "
+                      f"‘where … order by …. limit’, and 'select ... join table1 with table2 on column'. \nWhen asking for sample queries and writing "
                       f"your own in natural language, please try to include one of those "
                       f"keywords so our NLP can process your question. Table columns are CASE SENSITIVE.")
         user_input = input("\nAsk a question (Type 'Exit' to leave.):  ").strip()
@@ -595,7 +595,7 @@ def gen_sample_queries(connection, num_queries = 1, random_queries = True):
                 columns_used = ', '.join(set(col for col in filtered_tokens if col in numeric_columns + categorical_columns))
                 where_col, where_condition, where_value = get_where_clause(cursor, table_choice, numeric_columns, categorical_columns, columns, random_queries, conditions, where_tokens)
                     
-                print(f"Condition: {where_condition}, Value: {where_value}, agg_col: {where_col}, columns_used: {columns_used}")
+                # print(f"Condition: {where_condition}, Value: {where_value}, agg_col: {where_col}, columns_used: {columns_used}")
 
             
             if where_col is not None and where_condition is not None and where_value is not None:

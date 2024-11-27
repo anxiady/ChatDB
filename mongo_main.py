@@ -42,7 +42,7 @@ def mongo():
 
         if choice == "1":
             # Upload a dataset
-            file_path = input("Please enter the path to the CSV file you want to upload: ")
+            file_path = input("Please enter the path to the JSON file you want to upload: ")
             collection_name = input("Please enter the name of the collection where you want to upload the data: ")
 
             try:
@@ -50,7 +50,7 @@ def mongo():
             except FileNotFoundError:
                 print("\033[91mError:\033[0m The file path you provided does not exist. Please check the path and try again.")
             except pd.errors.EmptyDataError:
-                print("\033[91mError:\033[0m The provided file is empty or cannot be read. Please provide a valid CSV file.")
+                print("\033[91mError:\033[0m The provided file is empty or cannot be read. Please provide a valid JSON file.")
             except Exception as e:
                 print(f"An error occurred: {e}")
 

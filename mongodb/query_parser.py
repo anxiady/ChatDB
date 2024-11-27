@@ -60,7 +60,7 @@ def generate_example_queries(user_input, db, collection_name):
         "average": "average <A> by <B>",
         "count": "count number of <B>",
         "where": "find <A> where <B> <Operator> <C>",
-        "order by": "find <A> and order by <B>",
+        "order": "find <A> and order by <B>",
         "join": "join <A> with <B>",
         "min": "find the min <A> grouped by <B>",
         "max": "find the max <A> grouped by <B>"
@@ -79,7 +79,16 @@ def generate_example_queries(user_input, db, collection_name):
             selected_attribute_1 = random.choice([attr for attr in attributes if attribute_types.get(attr) in ["int", "float"]])
             selected_attribute_2 = random.choice([attr for attr in attributes if attribute_types.get(attr) not in ("int", "float") and attr != selected_attribute_1])
             operator = random.choice(conditions)
-            random_value = random.randint(1, 100)
+
+            distinct_values = db[collection_name].distinct(selected_attribute_2)
+        
+            # Choose a random value from the distinct values
+            if distinct_values:
+                random_value = random.choice(distinct_values)
+            else:
+                random_value = random.randint(1, 100)
+
+            # random_value = random.randint(1, 100)
             natural_language_query = template.replace("<A>", selected_attribute_1).replace("<B>", selected_attribute_2).replace("<Operator>", operator).replace("<C>", f"{random_value}")
             
             return natural_language_query
@@ -352,7 +361,8 @@ def preprocess(user_input, db, collection_name):
         elif keyword == "where":
             # Handle where conditions
             # tokens = word_tokenize(user_input)
-            tokens = user_input.lower().split()
+            # tokens = user_input.lower().split()
+            tokens = user_input.split()
             conditions = {}
             # where_col = next((col for col in selected_attributes if col in tokens), None)
             if "where" in tokens:
@@ -379,7 +389,7 @@ def preprocess(user_input, db, collection_name):
                 # Find the operator in the tokens
                 # condition_operator = next((op for op in operator_map.keys() if op in tokens), None)
                 condition_operator = next((op for op in operator_map.keys() if any(token == op for token in tokens)), None)
-                # print(condition_operator)
+                # print(f"condition_operator: {condition_operator}")
                 # print(tokens)
                 # print(user_input)
                 if condition_operator:

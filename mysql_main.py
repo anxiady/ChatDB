@@ -1,6 +1,6 @@
 from mysql.Upload_SQL import upload, upload_data_to_table, display_all_columns, display_columns, display_sample_rows
-from mysql.SQL_Queries_andy import connect_to_SQL
-from mysql.SQL_Queries_andy import gen_sample_queries
+from mysql.SQL_Queries import connect_to_SQL
+from mysql.SQL_Queries import gen_sample_queries
 import pymysql
 import pandas as pd
 
