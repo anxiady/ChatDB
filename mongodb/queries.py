@@ -12,7 +12,7 @@ def execute_aggregation_query(db, collection_name, pipeline):
 
 def print_all_data(db, collection_name):
     collection = db[collection_name]
-    results = collection.find()  # No filter, returns all documents
+    results = collection.find()  
     return list(results)
 
 # def display_first_five_rows(db, collection_name):
@@ -52,7 +52,7 @@ def display_all_columns(db):
     # Iterate through each collection
     for collection_name in collections:
         collection = db[collection_name]
-        sample_document = collection.find_one()  # Get a single document to infer schema
+        sample_document = collection.find_one()
 
         print(f"\nColumns in collection: {collection_name}")
 

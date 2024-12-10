@@ -19,13 +19,11 @@ def generate_mongo_query(user_input):
     tagged_tokens = pos_tag(filtered_tokens)
 
     if "find" in tokens or "show" in tokens:
-        # Assume user wants a basic find query
         for word, tag in tagged_tokens:
             if tag.startswith('NN') and 'artist' in word:
                 artist_name_index = tokens.index(word) + 1
                 if artist_name_index < len(tokens):
                     artist_name = tokens[artist_name_index]
-                    # Construct the find query
                     return {"type": "find", "query": {"artist_name": artist_name}}
 
     
@@ -51,7 +49,7 @@ def get_collection_attributes(db, collection_name):
     return []
 
 def generate_example_queries(user_input, db, collection_name):
-    # Define keywords and corresponding templates
+    # Define templates
     keyword_templates = {
         "group by": "group by <B> and calculate average of <A>",
         "total": "total <A> by <B>",
@@ -66,7 +64,6 @@ def generate_example_queries(user_input, db, collection_name):
         "max": "find the max <A> grouped by <B>"
     }
 
-    # Retrieve collection attributes to dynamically generate queries
     attributes = get_collection_attributes(db, collection_name)
     attribute_types = get_attribute_types(db, collection_name)
     if not attributes:
@@ -82,13 +79,11 @@ def generate_example_queries(user_input, db, collection_name):
 
             distinct_values = db[collection_name].distinct(selected_attribute_2)
         
-            # Choose a random value from the distinct values
             if distinct_values:
                 random_value = random.choice(distinct_values)
             else:
                 random_value = random.randint(1, 100)
 
-            # random_value = random.randint(1, 100)
             natural_language_query = template.replace("<A>", selected_attribute_1).replace("<B>", selected_attribute_2).replace("<Operator>", operator).replace("<C>", f"{random_value}")
             
             return natural_language_query
@@ -119,14 +114,12 @@ def generate_example_queries(user_input, db, collection_name):
 
     return natural_language_query
 
+# Execute the provided MongoDB query and return the result
 def execute_query(collection, mongo_query):
-    # Execute the provided MongoDB query and return the result
     try:
         if isinstance(mongo_query, list):
-            # If it's a pipeline for aggregation
             result = list(collection.aggregate(mongo_query))
         elif isinstance(mongo_query, dict):
-            # If it's a find filter
             result = list(collection.find(mongo_query))
         else:
             return "Unsupported query type."
@@ -170,9 +163,6 @@ def get_execute_query(db, collection_name, random_query):
         natural_language_query = user_input
 
         mongo_pipeline = preprocess(natural_language_query, db, collection_name)
-        # Convert pipeline to string representation
-        # query_string = convert_pipeline_to_string(db.name, collection_name, mongo_pipeline)
-        # print(f"Generated Query: {query_string}")
 
         print(f"Generated Query: db.{collection_name}.aggregate({mongo_pipeline})")
     
@@ -193,13 +183,13 @@ def display_joined_data(results):
     for result in results:
         if "joined_data" in result and isinstance(result["joined_data"], list) and result["joined_data"]:
             if len(result["joined_data"]) == 1:
-                joined_doc = result["joined_data"][0]  # Extract the single document
-                del result["joined_data"]  # Remove the joined_data field
+                joined_doc = result["joined_data"][0]
+                del result["joined_data"]  
                 for key, value in joined_doc.items():
                     if key not in result:
                         result[key] = value
             else:
-                result["joined_data_count"] = len(result["joined_data"])  # Add count of joined documents
+                result["joined_data_count"] = len(result["joined_data"]) 
         else:
             result.pop("joined_data", None)
 
@@ -247,14 +237,12 @@ def preprocess(user_input, db, collection_name):
     filtered_tokens = [word for word in tokens if word.isalnum() and word not in stop_words]
     tagged_tokens = pos_tag(filtered_tokens)
 
-    # Retrieve collection attributes and their types
-    attributes = get_collection_attributes(db, collection_name)  # Assume this returns a list of attribute names
-    attribute_types = get_attribute_types(db, collection_name)  # Assume this returns a dict {attr_name: type}
+    attributes = get_collection_attributes(db, collection_name) 
+    attribute_types = get_attribute_types(db, collection_name)
 
     if not attributes:
         raise ValueError("No attributes found in the collection for executing the query.")
 
-    # Identify keywords and attributes in the user input
     keywords = []
     for key in ["sum", "total", "average", "count", "group", "where", "order", "find", "join", "max", "min", "sort", "how many"]:
         if key in tokens:
@@ -263,23 +251,18 @@ def preprocess(user_input, db, collection_name):
     if "how many" in user_input.lower():
         keywords.append("how many")
 
-    # Identify the attributes present in the user input
     selected_attributes = [attr for attr in attributes if re.search(rf"\b{attr}\b", user_input, re.IGNORECASE)]
 
-    # Set default attributes if none are identified
     if not selected_attributes:
         # selected_attributes = [random.choice(attributes)]
         raise ValueError("Please enter a column to explore")
 
-    # Separate the attributes into numeric and string attributes
     numeric_attributes = [attr for attr in selected_attributes if attribute_types.get(attr) in ("int", "float")]
     string_attributes = [attr for attr in selected_attributes if attribute_types.get(attr) not in ("int", "float")]
 
-    # Assign the primary attributes for numeric operations and grouping
     numeric_attribute = numeric_attributes[0] if numeric_attributes else None
     string_attribute = string_attributes[0] if string_attributes else None
 
-    # Generate MongoDB pipeline based on identified keywords and attributes
     mongo_pipeline = []
 
     for keyword in keywords:
@@ -314,11 +297,11 @@ def preprocess(user_input, db, collection_name):
                 if string_attribute:
                     group_stage = {
                         "$group": {
-                            "_id": f"${string_attribute}"  # Group by the unique string attribute
+                            "_id": f"${string_attribute}"  
                         }
                     }
                     count_stage = {
-                        "$count": "unique_count"  # Count the number of unique groups
+                        "$count": "unique_count" 
                     }
                     mongo_pipeline.append(group_stage)
                     mongo_pipeline.append(count_stage)
@@ -329,14 +312,14 @@ def preprocess(user_input, db, collection_name):
                 if string_attribute:
                     group_stage = {
                         "$group": {
-                            "_id": f"${string_attribute}",  # Group by the string attribute
-                            "count": {"$sum": 1},  # Count occurrences
+                            "_id": f"${string_attribute}", 
+                            "count": {"$sum": 1},  
                         }
                     }
                     project_stage = {
                         "$project": {
                             "count": 1,
-                            string_attribute: 1  # Include the string attribute in the output
+                            string_attribute: 1  
                         }
                     }
                     mongo_pipeline.append(group_stage)
